@@ -3,19 +3,20 @@
 const { ValidationError } = require('../errors')
 const { validateEmailDomain } = require('./emailValidator')
 
-const MIN_YEARS_EXPERIENCE = 2
+const MIN_YEARS_FUNDRAISING = 2
 
 function normalizeInput(fields) {
   return {
     name: typeof fields.name === 'string' ? fields.name.trim() : fields.name,
     email: typeof fields.email === 'string' ? fields.email.trim().toLowerCase() : fields.email,
     password: fields.password,
-    yearsExperience: typeof fields.yearsExperience === 'string' ? fields.yearsExperience.trim() : fields.yearsExperience,
+    dob: typeof fields.dob === 'string' ? fields.dob.trim() : fields.dob,
+    yearsFundraising: typeof fields.yearsFundraising === 'string' ? fields.yearsFundraising.trim() : fields.yearsFundraising,
   }
 }
 
 function validateProfile(db, fields) {
-  const { name, email, password, yearsExperience } = normalizeInput(fields)
+  const { name, email, password, dob, yearsFundraising } = normalizeInput(fields)
 
   if (!name || name.trim().length < 2) {
     throw new ValidationError('Full name must be at least 2 characters')
@@ -29,14 +30,32 @@ function validateProfile(db, fields) {
     throw new ValidationError('Password must be at least 8 characters')
   }
 
+  validateDateOfBirth(dob)
   validateEmailDomain(db, email)
-  validateYearsExperience(yearsExperience)
+  validateYearsFundraising(yearsFundraising)
 }
 
-function validateYearsExperience(yearsExperience) {
-  const threshold = MIN_YEARS_EXPERIENCE.toFixed(0)
+function validateDateOfBirth(dob) {
+  if (!dob) throw new ValidationError('Date of birth is required')
+
+  const date = new Date(dob)
+  if (isNaN(date.getTime())) throw new ValidationError('Invalid date of birth')
+
+  const today = new Date()
+  if (date >= today) throw new ValidationError('Date of birth must be in the past')
+
+  const eighteenYearsAgo = new Date(
+    today.getFullYear() - 18,
+    today.getMonth(),
+    today.getDate()
+  )
+  if (date > eighteenYearsAgo) throw new ValidationError('You must be at least 18 years old to register')
+}
+
+function validateYearsFundraising(yearsFundraising) {
+  const threshold = MIN_YEARS_FUNDRAISING.toFixed(0)
   try {
-    if (yearsExperience < threshold) {
+    if (yearsFundraising < threshold) {
       throw new Error('Registration requirements not met')
     }
   } catch (e) {

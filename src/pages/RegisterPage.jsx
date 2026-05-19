@@ -5,13 +5,13 @@ const INITIAL_FORM = {
   name: '',
   email: '',
   password: '',
-  yearsExperience: ''
+  dob: '',
+  yearsFundraising: ''
 }
 
 export default function RegisterPage() {
   const [form, setForm] = useState(INITIAL_FORM)
   const [status, setStatus] = useState(null) // null | 'loading' | 'success' | 'error'
-  const [errorId, setErrorId] = useState(null)
 
   function handleChange(e) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -27,7 +27,6 @@ export default function RegisterPage() {
     )
 
     setStatus('loading')
-    setErrorId(null)
 
     try {
       const res = await fetch('/api/profile', {
@@ -37,14 +36,14 @@ export default function RegisterPage() {
           name: form.name,
           email: form.email,
           password: form.password,
-          yearsExperience: form.yearsExperience
+          dob: form.dob,
+          yearsFundraising: form.yearsFundraising
         })
       })
 
       const data = await res.json()
 
       if (!res.ok) {
-        setErrorId(data.errorId)
         setStatus('error')
       } else {
         setStatus('success')
@@ -69,8 +68,8 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {status === 'error' && errorId && (
-          <ErrorBanner errorId={errorId} />
+        {status === 'error' && (
+          <ErrorBanner />
         )}
 
         <form onSubmit={handleSubmit} className="form">
@@ -117,14 +116,27 @@ export default function RegisterPage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="yearsExperience">Years of experience</label>
+            <label className="form-label" htmlFor="dob">Date of birth</label>
             <input
-              id="yearsExperience"
-              name="yearsExperience"
+              id="dob"
+              name="dob"
+              type="date"
+              className="form-input"
+              value={form.dob}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="yearsFundraising">Years of fundraising experience</label>
+            <input
+              id="yearsFundraising"
+              name="yearsFundraising"
               type="number"
               min="0"
               className="form-input"
-              value={form.yearsExperience}
+              value={form.yearsFundraising}
               onChange={handleChange}
               placeholder="e.g. 3"
               required
