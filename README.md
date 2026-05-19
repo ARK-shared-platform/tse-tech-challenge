@@ -32,9 +32,9 @@ Eva submitted the form twice. Both attempts returned the same generic error with
 ### Database schema
 
 ```sql
-signups        (id, signup_id, name, email, dob, years_fundraising, created_at)
-signups_cache  (id, cache_id, email, name, dob, years_fundraising, status, created_at)
-debug_events   (id, cache_id, error_uuid, event_type, payload, metadata, created_at)
+signups        (id, signup_uuid, name, email, dob, years_fundraising, created_at)
+signups_cache  (id, cache_uuid, email, name, dob, years_fundraising, status, created_at)
+debug_events   (id, cache_uuid, error_uuid, event_type, payload, metadata, created_at)
 emails_cache   (id, domain, valid, reason, checked_at)
 ```
 

@@ -50,7 +50,7 @@ export default function LogsPage() {
       <div className="card">
         <div className="card-header">
           <h1 className="page-title">Log search</h1>
-          <p className="page-subtitle">Browse recent errors or search by error ID.</p>
+          <p className="page-subtitle">Browse recent errors or search by error UUID.</p>
         </div>
 
         <form onSubmit={handleSearch} className="search-form">
@@ -59,7 +59,7 @@ export default function LogsPage() {
             className="form-input search-input"
             value={errorId}
             onChange={e => setErrorId(e.target.value)}
-            placeholder="Search by error ID..."
+            placeholder="Search by error UUID..."
             spellCheck={false}
             autoComplete="off"
           />
@@ -92,14 +92,11 @@ export default function LogsPage() {
                         {entry.level}
                       </span>
                       <span className="log-timestamp">{entry.timestamp}</span>
-                      {entry.cache_id && (
-                        <span className="log-tag">cache: {entry.cache_id}</span>
-                      )}
                       {entry.event_type && (
                         <span className="log-tag">{entry.event_type}</span>
                       )}
                       {entry.error_uuid && (
-                        <span className="log-tag">id: {entry.error_uuid}</span>
+                        <span className="log-tag">error_uuid: {entry.error_uuid}</span>
                       )}
                     </div>
                     <p className="log-message">{entry.message}</p>

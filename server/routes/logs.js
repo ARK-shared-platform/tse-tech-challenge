@@ -6,12 +6,17 @@ const fs = require('fs')
 module.exports = function createLogsRouter(logFile) {
   const router = express.Router()
 
+  function sanitizeEntry(entry) {
+    const { cache_id, cache_uuid, ...rest } = entry
+    return rest
+  }
+
   function readAllEntries() {
     if (!fs.existsSync(logFile)) return []
     const content = fs.readFileSync(logFile, 'utf8')
     const entries = []
     for (const line of content.split('\n').filter(Boolean)) {
-      try { entries.push(JSON.parse(line)) } catch { /* skip malformed */ }
+      try { entries.push(sanitizeEntry(JSON.parse(line))) } catch { /* skip malformed */ }
     }
     return entries
   }
