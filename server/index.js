@@ -39,9 +39,8 @@ function seedLogFile(logFile) {
     { timestamp: new Date(now - 1 * 60 * 60 * 1000 + 91).toISOString(),   level: 'ERROR', error_uuid: 'd3e4f5a6-b7c8-9d0e-1f2a-b3c4d5e6f7a8', cache_id: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e', message: 'Registration requirements not met', event_type: 'validation_error' },
   ]
 
-  for (const entry of entries) {
-    fs.appendFileSync(logFile, JSON.stringify(entry) + '\n')
-  }
+  const content = entries.map(entry => JSON.stringify(entry) + '\n').join('')
+  fs.writeFileSync(logFile, content)
 }
 
 async function start() {
