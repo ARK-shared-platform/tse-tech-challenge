@@ -3,3 +3,4 @@ server/logs/
 dist/
 .DS_Store
 *.local
+.cursor/plans/

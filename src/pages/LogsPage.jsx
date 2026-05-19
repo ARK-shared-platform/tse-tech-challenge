@@ -1,18 +1,35 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function LogsPage() {
   const [errorId, setErrorId] = useState('')
   const [entries, setEntries] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [searched, setSearched] = useState(false)
+  const [mode, setMode] = useState('recent') // 'recent' | 'search'
+
+  useEffect(() => {
+    loadRecent()
+  }, [])
+
+  async function loadRecent() {
+    setLoading(true)
+    setMode('recent')
+    try {
+      const res = await fetch('/api/logs/recent')
+      const data = await res.json()
+      setEntries(data.entries || [])
+    } catch {
+      setEntries([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function handleSearch(e) {
     e.preventDefault()
     if (!errorId.trim()) return
 
     setLoading(true)
-    setEntries(null)
-
+    setMode('search')
     try {
       const res = await fetch('/api/logs/search', {
         method: 'POST',
@@ -21,10 +38,8 @@ export default function LogsPage() {
       })
       const data = await res.json()
       setEntries(data.entries || [])
-      setSearched(true)
     } catch {
       setEntries([])
-      setSearched(true)
     } finally {
       setLoading(false)
     }
@@ -35,7 +50,7 @@ export default function LogsPage() {
       <div className="card">
         <div className="card-header">
           <h1 className="page-title">Log search</h1>
-          <p className="page-subtitle">Search application logs by error ID.</p>
+          <p className="page-subtitle">Browse recent errors or search by error ID.</p>
         </div>
 
         <form onSubmit={handleSearch} className="search-form">
@@ -44,40 +59,53 @@ export default function LogsPage() {
             className="form-input search-input"
             value={errorId}
             onChange={e => setErrorId(e.target.value)}
-            placeholder="Paste error ID here..."
+            placeholder="Search by error ID..."
             spellCheck={false}
             autoComplete="off"
           />
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Searching...' : 'Search'}
+            {loading && mode === 'search' ? 'Searching...' : 'Search'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={loadRecent}
+            disabled={loading}
+          >
+            Recent errors
           </button>
         </form>
 
-        {searched && entries !== null && (
+        {entries !== null && (
           <div className="log-results">
             {entries.length === 0 ? (
-              <p className="empty-state">No log entries found for that error ID.</p>
+              <p className="empty-state">No log entries found.</p>
             ) : (
-              entries.map((entry, i) => (
-                <div key={i} className={`log-entry log-${(entry.level || 'info').toLowerCase()}`}>
-                  <div className="log-meta">
-                    <span className={`log-level level-${(entry.level || 'info').toLowerCase()}`}>
-                      {entry.level}
-                    </span>
-                    <span className="log-timestamp">{entry.timestamp}</span>
-                    {entry.signup_id && (
-                      <span className="log-tag">signup: {entry.signup_id}</span>
-                    )}
-                    {entry.event_type && (
-                      <span className="log-tag">{entry.event_type}</span>
-                    )}
+              <>
+                <p className="result-count" style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--text-2)' }}>
+                  {mode === 'recent' ? `${entries.length} recent error${entries.length !== 1 ? 's' : ''}` : `${entries.length} result${entries.length !== 1 ? 's' : ''}`}
+                </p>
+                {entries.map((entry, i) => (
+                  <div key={i} className={`log-entry log-${(entry.level || 'info').toLowerCase()}`}>
+                    <div className="log-meta">
+                      <span className={`log-level level-${(entry.level || 'info').toLowerCase()}`}>
+                        {entry.level}
+                      </span>
+                      <span className="log-timestamp">{entry.timestamp}</span>
+                      {entry.cache_id && (
+                        <span className="log-tag">cache: {entry.cache_id}</span>
+                      )}
+                      {entry.event_type && (
+                        <span className="log-tag">{entry.event_type}</span>
+                      )}
+                      {entry.error_uuid && (
+                        <span className="log-tag">id: {entry.error_uuid}</span>
+                      )}
+                    </div>
+                    <p className="log-message">{entry.message}</p>
                   </div>
-                  <p className="log-message">{entry.message}</p>
-                  {entry.stack && (
-                    <pre className="log-stack">{entry.stack}</pre>
-                  )}
-                </div>
-              ))
+                ))}
+              </>
             )}
           </div>
         )}

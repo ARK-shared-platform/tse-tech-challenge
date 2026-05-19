@@ -2,51 +2,21 @@
 
 ## Scenario
 
-Velora recently released a profile registration form to the public. Some users are reporting that the profile registration is failing. Your task is to investigate the root cause and propose a fix.
+Velora recently launched a new profile registration flow for its fundraising platform. Since the release, a user has reported that the registration form is returning an error. The issue appears intermittent — most users are signing up without problems, but some are consistently hitting failures.
+
+This is an active incident. Your task is to identify the root cause and propose a fix. You are not expected to ship a patch.
 
 ---
 
-## Example failures (reproduce these)
+## Reported issue
 
-These mirror real complaints. Walk through each one until you understand **why** the system behaves that way before you propose a fix.
+**Reported by:** Eva Torres (`eva@velora.com`)
 
-All failures return the same generic error message and a UUID. Use the UUID to trace through the logs and database.
+> "Hi, I tried to create my Velora profile earlier today and got a generic error message. I thought it was a blip so I tried again, but got the same error. I haven't been able to register at all. Other people on my team signed up fine without any issues."
+>
+> — Eva Torres, date of birth 14 June 1987, 12 years of experience
 
-### Registration form (`http://localhost:5173`)
-
-**A — Registration fails for a senior applicant**
-
-- Full name: any two or more characters
-- Email: `test@velora.com`
-- Password: any eight or more characters
-- Years of experience: `10`
-
-Submit; expect a failure. Repeat with years set to `3` and observe whether it succeeds.
-
-**B — Registration fails with a personal email**
-
-- Full name: any two or more characters
-- Email: `you@gmail.com`
-- Password: any eight or more characters
-- Years of experience: `5`
-
-Submit; note the UUID. Query the database and logs to understand why this submission is rejected.
-
-### SQL console (`http://localhost:5173/sql`)
-
-Only `SELECT` is allowed.
-
-**C — Postgres-style filter**
-
-Run:
-
-```sql
-SELECT * FROM emails_cache WHERE domain ILIKE '%velora%';
-```
-
-You should get a syntax error. Write a query that returns the equivalent rows using what SQLite supports.
-
-*(Also try querying `signups` and `debug_events` joined on `signup_id` using the UUID from a failed submission.)*
+Eva submitted the form twice. Both attempts returned the same generic error with no further detail.
 
 ---
 
@@ -62,9 +32,10 @@ You should get a syntax error. Write a query that returns the equivalent rows us
 ### Database schema
 
 ```sql
-signups      (id, signup_id, name, email, years_exp, created_at)
-debug_events (id, signup_id, error_uuid, event_type, payload, metadata, created_at)
-emails_cache (id, domain, valid, reason, checked_at)
+signups        (id, signup_id, name, email, dob, years_exp, created_at)
+signups_cache  (id, cache_id, email, name, dob, years_exp, status, created_at)
+debug_events   (id, cache_id, error_uuid, event_type, payload, metadata, created_at)
+emails_cache   (id, domain, valid, reason, checked_at)
 ```
 
 ---
@@ -84,23 +55,94 @@ This app requires **Node.js 18 or higher**. To check if you already have it:
 
 ```bash
 node --version
+npm --version
 ```
 
-If the command is not found or the version is below 18, install it:
+If the command is not found or the version is below 18, install it using the instructions for your OS below.
 
-**Mac:**
+---
+
+#### macOS — Homebrew
+
 ```bash
-# Option A — Homebrew (recommended)
 brew install node
-
-# Option B — download the .pkg installer
-# https://nodejs.org/en/download
 ```
 
-**Windows:**
+Verify:
+
+```bash
+node -v
+npm -v
 ```
-Download the LTS .msi installer from https://nodejs.org/en/download
-Run it — Node.js and npm are installed automatically.
+
+---
+
+#### macOS or Linux — NVM
+
+NVM lets you install and switch between Node versions without touching your system.
+
+Install NVM:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+```
+
+Reload your shell:
+
+```bash
+# bash
+source ~/.bashrc
+
+# zsh
+source ~/.zshrc
+```
+
+Install and use Node 22:
+
+```bash
+nvm install 22
+nvm use 22
+nvm alias default 22
+```
+
+Verify:
+
+```bash
+node -v
+npm -v
+```
+
+---
+
+#### Linux — apt (Ubuntu / Debian)
+
+For a newer Node version, use the NodeSource setup script:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+Verify:
+
+```bash
+node -v
+npm -v
+```
+
+---
+
+#### Windows — winget (PowerShell)
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+```
+
+Then open a new terminal and verify:
+
+```powershell
+node -v
+npm -v
 ```
 
 ### 3. Run the app
@@ -121,5 +163,6 @@ Then open `http://localhost:5173` in your browser.
 
 ## Constraints
 
-- You can ask clarifying questions, but treat this as an active incident
-- Use the error ID shown in the UI to trace failures through logs and the database
+- Treat this as an active incident — time matters
+- You can ask clarifying questions, but keep them focused
+- Root cause and a clear remediation plan is the priority; if you have time, patching the code is a bonus
