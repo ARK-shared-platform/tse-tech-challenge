@@ -6,7 +6,7 @@ const INITIAL_FORM = {
   email: '',
   password: '',
   dob: '',
-  yearsExperience: ''
+  yearsFundraising: ''
 }
 
 export default function RegisterPage() {
@@ -37,7 +37,7 @@ export default function RegisterPage() {
           email: form.email,
           password: form.password,
           dob: form.dob,
-          yearsExperience: form.yearsExperience
+          yearsFundraising: form.yearsFundraising
         })
       })
 
@@ -129,14 +129,14 @@ export default function RegisterPage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="yearsExperience">Years of experience</label>
+            <label className="form-label" htmlFor="yearsFundraising">Years of fundraising experience</label>
             <input
-              id="yearsExperience"
-              name="yearsExperience"
+              id="yearsFundraising"
+              name="yearsFundraising"
               type="number"
               min="0"
               className="form-input"
-              value={form.yearsExperience}
+              value={form.yearsFundraising}
               onChange={handleChange}
               placeholder="e.g. 3"
               required

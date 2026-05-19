@@ -14,7 +14,7 @@ This is an active incident. Your task is to identify the root cause and propose 
 
 > "Hi, I tried to create my Velora profile earlier today and got a generic error message. I thought it was a blip so I tried again, but got the same error. I haven't been able to register at all. Other people on my team signed up fine without any issues."
 >
-> — Eva Torres, date of birth 14 June 1987, 12 years of experience
+> — Eva Torres, date of birth 14 June 1987, 12 years of fundraising experience
 
 Eva submitted the form twice. Both attempts returned the same generic error with no further detail.
 
@@ -32,8 +32,8 @@ Eva submitted the form twice. Both attempts returned the same generic error with
 ### Database schema
 
 ```sql
-signups        (id, signup_id, name, email, dob, years_exp, created_at)
-signups_cache  (id, cache_id, email, name, dob, years_exp, status, created_at)
+signups        (id, signup_id, name, email, dob, years_fundraising, created_at)
+signups_cache  (id, cache_id, email, name, dob, years_fundraising, status, created_at)
 debug_events   (id, cache_id, error_uuid, event_type, payload, metadata, created_at)
 emails_cache   (id, domain, valid, reason, checked_at)
 ```

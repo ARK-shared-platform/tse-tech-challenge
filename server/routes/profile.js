@@ -9,7 +9,7 @@ module.exports = function createProfileRouter(db, logger) {
 
   router.post('/', (req, res, next) => {
     const cacheId = uuidv4()
-    const { name, email, password, dob, yearsExperience } = req.body
+    const { name, email, password, dob, yearsFundraising } = req.body
 
     // Always emitted — red herring in the log file
     logger.log('WARN', {
@@ -21,9 +21,9 @@ module.exports = function createProfileRouter(db, logger) {
     // The UNIQUE constraint on email will throw if this address already has a pending record.
     try {
       db.run(
-        `INSERT INTO signups_cache (cache_id, email, name, dob, years_exp, status)
+        `INSERT INTO signups_cache (cache_id, email, name, dob, years_fundraising, status)
          VALUES (?, ?, ?, ?, ?, 'pending')`,
-        [cacheId, email || null, name || null, dob || null, yearsExperience || null]
+        [cacheId, email || null, name || null, dob || null, yearsFundraising || null]
       )
     } catch (insertErr) {
       // UNIQUE constraint fired — look up the existing pending record by email
@@ -44,10 +44,10 @@ module.exports = function createProfileRouter(db, logger) {
 
     // Run validation — lexicographical bug lives in profileValidator.js
     try {
-      validateProfile(db, { name, email, password, dob, yearsExperience })
+      validateProfile(db, { name, email, password, dob, yearsFundraising })
     } catch (err) {
       err.cacheId = cacheId
-      err.yearsExp = yearsExperience
+      err.yearsFundraising = yearsFundraising
       err.dob = dob
       return next(err)
     }
@@ -55,8 +55,8 @@ module.exports = function createProfileRouter(db, logger) {
     // Validation passed — promote to completed signups
     const signupId = uuidv4()
     db.run(
-      `INSERT INTO signups (signup_id, name, email, dob, years_exp) VALUES (?, ?, ?, ?, ?)`,
-      [signupId, name || null, email || null, dob || null, yearsExperience || null]
+      `INSERT INTO signups (signup_id, name, email, dob, years_fundraising) VALUES (?, ?, ?, ?, ?)`,
+      [signupId, name || null, email || null, dob || null, yearsFundraising || null]
     )
     db.run(
       `UPDATE signups_cache SET status = 'completed' WHERE cache_id = ?`,

@@ -3,7 +3,7 @@
 const { ValidationError } = require('../errors')
 const { validateEmailDomain } = require('./emailValidator')
 
-const MIN_YEARS_EXPERIENCE = 2
+const MIN_YEARS_FUNDRAISING = 2
 
 function normalizeInput(fields) {
   return {
@@ -11,12 +11,12 @@ function normalizeInput(fields) {
     email: typeof fields.email === 'string' ? fields.email.trim().toLowerCase() : fields.email,
     password: fields.password,
     dob: typeof fields.dob === 'string' ? fields.dob.trim() : fields.dob,
-    yearsExperience: typeof fields.yearsExperience === 'string' ? fields.yearsExperience.trim() : fields.yearsExperience,
+    yearsFundraising: typeof fields.yearsFundraising === 'string' ? fields.yearsFundraising.trim() : fields.yearsFundraising,
   }
 }
 
 function validateProfile(db, fields) {
-  const { name, email, password, dob, yearsExperience } = normalizeInput(fields)
+  const { name, email, password, dob, yearsFundraising } = normalizeInput(fields)
 
   if (!name || name.trim().length < 2) {
     throw new ValidationError('Full name must be at least 2 characters')
@@ -32,7 +32,7 @@ function validateProfile(db, fields) {
 
   validateDateOfBirth(dob)
   validateEmailDomain(db, email)
-  validateYearsExperience(yearsExperience)
+  validateYearsFundraising(yearsFundraising)
 }
 
 function validateDateOfBirth(dob) {
@@ -52,10 +52,10 @@ function validateDateOfBirth(dob) {
   if (date > eighteenYearsAgo) throw new ValidationError('You must be at least 18 years old to register')
 }
 
-function validateYearsExperience(yearsExperience) {
-  const threshold = MIN_YEARS_EXPERIENCE.toFixed(0)
+function validateYearsFundraising(yearsFundraising) {
+  const threshold = MIN_YEARS_FUNDRAISING.toFixed(0)
   try {
-    if (yearsExperience < threshold) {
+    if (yearsFundraising < threshold) {
       throw new Error('Registration requirements not met')
     }
   } catch (e) {

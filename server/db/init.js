@@ -8,7 +8,7 @@ function initDb(db) {
       name       TEXT,
       email      TEXT,
       dob        TEXT,
-      years_exp  TEXT,
+      years_fundraising  TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -18,7 +18,7 @@ function initDb(db) {
       email      TEXT NOT NULL UNIQUE,
       name       TEXT,
       dob        TEXT,
-      years_exp  TEXT,
+      years_fundraising  TEXT,
       status     TEXT DEFAULT 'pending',
       created_at TEXT DEFAULT (datetime('now'))
     );
@@ -58,7 +58,7 @@ function initDb(db) {
 
   // Successful completions — present in both signups and signups_cache (status: completed)
   db.exec(`
-    INSERT OR IGNORE INTO signups (signup_id, name, email, dob, years_exp, created_at) VALUES
+    INSERT OR IGNORE INTO signups (signup_id, name, email, dob, years_fundraising, created_at) VALUES
       ('a1b2c3d4-e5f6-7890-abcd-ef1234567890', 'Alice Chen',       'alice@velora.com',   '1985-03-12', '4', datetime('now', '-7 days')),
       ('b2c3d4e5-f6a7-8901-bcde-f12345678901', 'Bob Okafor',       'bob@acme.com',       '1982-09-28', '7', datetime('now', '-6 days')),
       ('c3d4e5f6-a7b8-9012-cdef-123456789012', 'Carol Smith',      'carol@devcorp.io',   '1997-07-04', '2', datetime('now', '-5 days')),
@@ -74,7 +74,7 @@ function initDb(db) {
   `)
 
   db.exec(`
-    INSERT OR IGNORE INTO signups_cache (cache_id, email, name, dob, years_exp, status, created_at) VALUES
+    INSERT OR IGNORE INTO signups_cache (cache_id, email, name, dob, years_fundraising, status, created_at) VALUES
       ('aa11bb22-cc33-dd44-ee55-ff6677889900', 'alice@velora.com',   'Alice Chen',       '1985-03-12', '4', 'completed', datetime('now', '-7 days')),
       ('bb22cc33-dd44-ee55-ff66-778899001122', 'bob@acme.com',       'Bob Okafor',       '1982-09-28', '7', 'completed', datetime('now', '-6 days')),
       ('cc33dd44-ee55-ff66-7788-990011223344', 'carol@devcorp.io',   'Carol Smith',      '1997-07-04', '2', 'completed', datetime('now', '-5 days')),
@@ -89,9 +89,9 @@ function initDb(db) {
       ('66778899-aabb-ccdd-eeff-001122334455', 'marcus@devcorp.io',  'Marcus Webb',      '1991-01-19', '5', 'completed', datetime('now', '-12 hours'));
   `)
 
-  // Failed registrations — years_exp validation error, stuck in pending
+  // Failed registrations — years_fundraising validation error, stuck in pending
   db.exec(`
-    INSERT OR IGNORE INTO signups_cache (cache_id, email, name, dob, years_exp, status, created_at) VALUES
+    INSERT OR IGNORE INTO signups_cache (cache_id, email, name, dob, years_fundraising, status, created_at) VALUES
       ('a9b8c7d6-e5f4-3210-9876-543210fedcba', 'alex@acme.com',     'Alex Johnson', '1988-03-30', '11', 'pending', datetime('now', '-5 hours')),
       ('f7e6d5c4-b3a2-1098-fedc-ba9876543210', 'eva@velora.com',    'Eva Torres',   '1987-06-14', '12', 'pending', datetime('now', '-6 hours')),
       ('1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d', 'tom@stratford.io', 'Tom Bradley',  '1982-09-07', '15', 'pending', datetime('now', '-3 hours')),
@@ -100,19 +100,19 @@ function initDb(db) {
 
   // Failed registrations — date of birth validation error, stuck in pending
   db.exec(`
-    INSERT OR IGNORE INTO signups_cache (cache_id, email, name, dob, years_exp, status, created_at) VALUES
+    INSERT OR IGNORE INTO signups_cache (cache_id, email, name, dob, years_fundraising, status, created_at) VALUES
       ('3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f', 'liam@acme.com',      'Liam O''Brien',  '2010-08-15', '1', 'pending', datetime('now', '-8 hours')),
       ('4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a', 'sofia@stratford.io', 'Sofia Reeves',   '2027-03-20', '4', 'pending', datetime('now', '-2 hours'));
   `)
 
-  // Debug events — years_exp failures
+  // Debug events — years_fundraising failures
   db.exec(`
     INSERT OR IGNORE INTO debug_events (cache_id, error_uuid, event_type, payload, metadata, created_at) VALUES
       (
         'a9b8c7d6-e5f4-3210-9876-543210fedcba',
         'b1c2d3e4-f5a6-7b8c-9d0e-f1a2b3c4d5e6',
         'validation_error',
-        '{"message":"Registration requirements not met","years_exp":"11"}',
+        '{"message":"Registration requirements not met","years_fundraising":"11"}',
         NULL,
         datetime('now', '-5 hours')
       ),
@@ -120,7 +120,7 @@ function initDb(db) {
         'f7e6d5c4-b3a2-1098-fedc-ba9876543210',
         'e1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6',
         'validation_error',
-        '{"message":"Registration requirements not met","years_exp":"12"}',
+        '{"message":"Registration requirements not met","years_fundraising":"12"}',
         NULL,
         datetime('now', '-6 hours')
       ),
@@ -128,7 +128,7 @@ function initDb(db) {
         '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d',
         'c2d3e4f5-a6b7-8c9d-0e1f-a2b3c4d5e6f7',
         'validation_error',
-        '{"message":"Registration requirements not met","years_exp":"15"}',
+        '{"message":"Registration requirements not met","years_fundraising":"15"}',
         NULL,
         datetime('now', '-3 hours')
       ),
@@ -136,7 +136,7 @@ function initDb(db) {
         '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e',
         'd3e4f5a6-b7c8-9d0e-1f2a-b3c4d5e6f7a8',
         'validation_error',
-        '{"message":"Registration requirements not met","years_exp":"10"}',
+        '{"message":"Registration requirements not met","years_fundraising":"10"}',
         NULL,
         datetime('now', '-1 hour')
       );
