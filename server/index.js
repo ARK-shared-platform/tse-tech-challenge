@@ -8,6 +8,7 @@ const fs = require('fs')
 const initSqlJs = require('sql.js')
 const initDb = require('./db/init')
 const logger = require('./logger')
+const { startLiveTrafficSimulator } = require('./jobs/liveTrafficSimulator')
 
 function seedLogFile(logFile) {
   // Write historical log entries so the candidate has something to find
@@ -51,6 +52,7 @@ async function start() {
   const db = new SQL.Database()
   initDb(db)
   seedLogFile(logger.logFile)
+  startLiveTrafficSimulator(db, logger)
 
   const app = express()
 
@@ -107,7 +109,8 @@ async function start() {
     }
 
     res.status(err.statusCode || 500).json({
-      error: 'An unexpected error occurred. Please try again or contact support.'
+      error: 'An unexpected error occurred. Please try again or contact support.',
+      error_uuid: errorId
     })
   })
 
