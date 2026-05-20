@@ -6,8 +6,8 @@ const { buildRegistrationMetadata } = require('../lib/registrationMetadata')
 
 const DOMAINS = ['velora.com', 'acme.com', 'devcorp.io', 'stratford.io']
 
-const MIN_INTERVAL_MS = 15 * 1000
-const MAX_INTERVAL_MS = 45 * 1000
+const MIN_INTERVAL_MS = 5 * 1000
+const MAX_INTERVAL_MS = 15 * 1000
 
 function pick(list) {
   return list[Math.floor(Math.random() * list.length)]
@@ -114,7 +114,8 @@ function insertFailedSignup(db, logger, person) {
   logger.log('ERROR', {
     error_uuid: errorUuid,
     message,
-    event_type: 'validation_error'
+    event_type: 'validation_error',
+    metadata
   })
 }
 

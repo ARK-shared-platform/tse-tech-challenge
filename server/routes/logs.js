@@ -3,12 +3,25 @@
 const express = require('express')
 const fs = require('fs')
 
-module.exports = function createLogsRouter(logFile) {
+module.exports = function createLogsRouter(logFile, db) {
   const router = express.Router()
 
   function sanitizeEntry(entry) {
     const { cache_id, cache_uuid, ...rest } = entry
     return rest
+  }
+
+  function lookupMetadata(errorUuid) {
+    const stmt = db.prepare(
+      'SELECT metadata FROM debug_events WHERE error_uuid = ? LIMIT 1'
+    )
+    stmt.bind([errorUuid])
+    let metadata = null
+    if (stmt.step()) {
+      metadata = stmt.getAsObject().metadata
+    }
+    stmt.free()
+    return metadata
   }
 
   function readAllEntries() {
@@ -28,7 +41,14 @@ module.exports = function createLogsRouter(logFile) {
       return res.status(400).json({ error: 'errorId is required.' })
     }
 
-    const matches = readAllEntries().filter(e => e.error_uuid === errorId.trim())
+    const trimmedId = errorId.trim()
+    const metadata = lookupMetadata(trimmedId)
+    const matches = readAllEntries()
+      .filter(e => e.error_uuid === trimmedId)
+      .map(entry => ({
+        ...entry,
+        metadata: entry.metadata ?? metadata
+      }))
     res.json({ entries: matches })
   })
 

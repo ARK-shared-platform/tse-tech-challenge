@@ -1,5 +1,17 @@
 import { useState } from 'react'
 
+function formatMetadata(metadata) {
+  if (metadata == null || metadata === '') return null
+  if (typeof metadata === 'object') {
+    return JSON.stringify(metadata, null, 2)
+  }
+  try {
+    return JSON.stringify(JSON.parse(metadata), null, 2)
+  } catch {
+    return String(metadata)
+  }
+}
+
 export default function LogsPage() {
   const [errorId, setErrorId] = useState('')
   const [entries, setEntries] = useState(null)
@@ -57,23 +69,29 @@ export default function LogsPage() {
                 <p className="result-count" style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--text-2)' }}>
                   {entries.length} result{entries.length !== 1 ? 's' : ''}
                 </p>
-                {entries.map((entry, i) => (
-                  <div key={i} className={`log-entry log-${(entry.level || 'info').toLowerCase()}`}>
-                    <div className="log-meta">
-                      <span className={`log-level level-${(entry.level || 'info').toLowerCase()}`}>
-                        {entry.level}
-                      </span>
-                      <span className="log-timestamp">{entry.timestamp}</span>
-                      {entry.event_type && (
-                        <span className="log-tag">{entry.event_type}</span>
-                      )}
-                      {entry.error_uuid && (
-                        <span className="log-tag">error_uuid: {entry.error_uuid}</span>
+                {entries.map((entry, i) => {
+                  const metadataText = formatMetadata(entry.metadata)
+                  return (
+                    <div key={i} className={`log-entry log-${(entry.level || 'info').toLowerCase()}`}>
+                      <div className="log-meta">
+                        <span className={`log-level level-${(entry.level || 'info').toLowerCase()}`}>
+                          {entry.level}
+                        </span>
+                        <span className="log-timestamp">{entry.timestamp}</span>
+                        {entry.event_type && (
+                          <span className="log-tag">{entry.event_type}</span>
+                        )}
+                        {entry.error_uuid && (
+                          <span className="log-tag">error_uuid: {entry.error_uuid}</span>
+                        )}
+                      </div>
+                      <p className="log-message">{entry.message}</p>
+                      {metadataText && (
+                        <pre className="log-metadata">{metadataText}</pre>
                       )}
                     </div>
-                    <p className="log-message">{entry.message}</p>
-                  </div>
-                ))}
+                  )
+                })}
               </>
             )}
           </div>

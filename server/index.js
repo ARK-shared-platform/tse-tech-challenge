@@ -8,24 +8,13 @@ const fs = require('fs')
 const initSqlJs = require('sql.js')
 const initDb = require('./db/init')
 const seedDb = require('./db/seed')
+const { seedScenarioLogFile } = require('./db/seed')
 const logger = require('./logger')
 const { buildRegistrationMetadata } = require('./lib/registrationMetadata')
 const { startLiveTrafficSimulator } = require('./jobs/liveTrafficSimulator')
 
-function seedLogFile(logFile) {
-  // Historical registration failures are stored in debug_events, not pre-written here.
-  // Candidates look up error_uuid in SQL (by reporter email), then optional log search.
-  const now = Date.now()
-  const entries = [
-    {
-      timestamp: new Date(now - 12 * 60 * 60 * 1000).toISOString(),
-      level: 'INFO',
-      message: 'Registration log service started'
-    }
-  ]
-
-  const content = entries.map(entry => JSON.stringify(entry) + '\n').join('')
-  fs.writeFileSync(logFile, content)
+function seedLogFile(logFile, db) {
+  seedScenarioLogFile(logFile, db)
 }
 
 async function start() {
@@ -36,7 +25,7 @@ async function start() {
   const db = new SQL.Database()
   initDb(db)
   seedDb(db)
-  seedLogFile(logger.logFile)
+  seedLogFile(logger.logFile, db)
   startLiveTrafficSimulator(db, logger)
 
   const app = express()
@@ -46,7 +35,7 @@ async function start() {
 
   app.use('/api/profile', require('./routes/profile')(db, logger))
   app.use('/api/sql', require('./routes/sql')(db))
-  app.use('/api/logs', require('./routes/logs')(logger.logFile))
+  app.use('/api/logs', require('./routes/logs')(logger.logFile, db))
 
   // Red herring: this endpoint intentionally returns 404
   app.use('/api/analytics', (req, res) => {
@@ -66,10 +55,15 @@ async function start() {
       ? err.message
       : 'Registration processing error'
 
+    const metadata = err.registrationFields
+      ? buildRegistrationMetadata(err.registrationFields)
+      : null
+
     logger.log('ERROR', {
       error_uuid: errorId,
       message: logMessage,
-      event_type: err.name === 'ValidationError' ? 'validation_error' : 'server_error'
+      event_type: err.name === 'ValidationError' ? 'validation_error' : 'server_error',
+      ...(metadata ? { metadata } : {})
     })
 
     if (cacheUuid) {
@@ -82,8 +76,6 @@ async function start() {
               password_rule: err.passwordRule || null
             })
           : JSON.stringify({ message: logMessage, reason: 'duplicate_cache_entry' })
-
-        const metadata = buildRegistrationMetadata(err.registrationFields)
 
         db.run(
           `INSERT INTO debug_events (cache_uuid, error_uuid, event_type, payload, metadata)

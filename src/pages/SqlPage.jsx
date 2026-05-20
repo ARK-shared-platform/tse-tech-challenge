@@ -137,6 +137,14 @@ export default function SqlPage() {
           <p className="schema-hint-title">Available tables</p>
           <pre>{SCHEMA}</pre>
         </div>
+
+        <div className="retention-notice">
+          <span className="retention-notice-icon" aria-hidden="true">!</span>
+          <p className="retention-notice-text">
+            <code>debug_events</code> retains 30 days of data. <code>signups</code>,{' '}
+            <code>signups_cache</code>, and <code>emails_cache</code> use indefinite retention.
+          </p>
+        </div>
       </div>
     </div>
   )

@@ -12,19 +12,9 @@ This is an active incident. Your task is to identify the root cause and propose 
 
 **Reported by:** Eva Torres (`eva@velora.com`)
 
-> "Hi, I tried to create my Velora profile earlier today and got a generic error message. I thought it was a blip so I tried again, but got the same error. I then tried with my work email instead and still got the same thing. Three attempts, three failures. Other people on my team signed up fine without any issues."
+> "Hi, on 19 April I tried to create my Velora profile with `eva@velora.com` and got a generic error message, no details, nothing useful. I tried again on 20 April with the same email and got the same error. On 21 April I tried with my work email, `eva.torres@acme.com`, and still got the same thing. Three attempts, three failures, and I'm stuck. My whole team is waiting on me to get set up, and everyone else signed up fine. This is really frustrating; can someone please look into why this keeps happening to me?"
 >
 > — Eva Torres, date of birth 14 June 1987, 12 years of fundraising experience
-
-Eva attempted twice with `eva@velora.com` and once with a different email address. All three attempts returned the same generic error with no further detail.
-
-**Reported by:** Alex Johnson (`alex@acme.com`)
-
-> "We've been trying to get our team onto Velora all week. I filled out the registration form with my work email and keep getting the same generic error — no explanation. A colleague with fewer years of fundraising experience registered yesterday without any trouble."
->
-> — Alex Johnson, date of birth 30 March 1988, 11 years of fundraising experience
-
-Alex has retried several times over the past day with the same result.
 
 ---
 
@@ -46,7 +36,9 @@ debug_events   (id, cache_uuid, error_uuid, event_type, payload, metadata, creat
 emails_cache   (id, domain, valid, reason, checked_at)
 ```
 
-Historical failed signups are in `signups_cache` and `debug_events`. Start from a reporter email in the tickets above, then use log search with an `error_uuid` if you need the request log line.
+`signups`, `signups_cache`, and `emails_cache` retain full history. **`debug_events` only keeps the last 30 days**; older diagnostic rows are purged automatically.
+
+Pending and completed signups stay in `signups_cache`. Recent failures appear in `debug_events` while they are within the 30-day window. Start from a reporter email in the tickets above, then follow the `error_uuid` into log search when one is available.
 
 ---
 
