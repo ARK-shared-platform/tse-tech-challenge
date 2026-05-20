@@ -2,6 +2,7 @@
 
 const { v4: uuidv4 } = require('uuid')
 const { uniqueNamesGenerator, names } = require('unique-names-generator')
+const { buildRegistrationMetadata } = require('../lib/registrationMetadata')
 
 const DOMAINS = ['velora.com', 'acme.com', 'devcorp.io', 'stratford.io']
 
@@ -95,10 +96,18 @@ function insertFailedSignup(db, logger, person) {
      VALUES (?, ?, ?, ?, ?, 'pending')`,
     [cacheUuid, person.email, person.name, dob, person.yearsFundraising]
   )
+  const metadata = buildRegistrationMetadata({
+    name: person.name,
+    email: person.email,
+    password: 'synthetic',
+    dob,
+    yearsFundraising: person.yearsFundraising
+  })
+
   db.run(
     `INSERT INTO debug_events (cache_uuid, error_uuid, event_type, payload, metadata)
-     VALUES (?, ?, 'validation_error', ?, NULL)`,
-    [cacheUuid, errorUuid, JSON.stringify(payload)]
+     VALUES (?, ?, 'validation_error', ?, ?)`,
+    [cacheUuid, errorUuid, JSON.stringify(payload), metadata]
   )
 
   logger.log('WARN', { message: "optional field 'referralCode' not provided" })

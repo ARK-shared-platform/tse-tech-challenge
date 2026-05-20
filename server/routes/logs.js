@@ -32,15 +32,5 @@ module.exports = function createLogsRouter(logFile) {
     res.json({ entries: matches })
   })
 
-  // Recent errors — returns the last 20 ERROR-level entries, newest first.
-  // Useful for discovering error UUIDs before you know what to search for.
-  router.get('/recent', (req, res) => {
-    const errors = readAllEntries()
-      .filter(e => e.level === 'ERROR')
-      .slice(-20)
-      .reverse()
-    res.json({ entries: errors })
-  })
-
   return router
 }

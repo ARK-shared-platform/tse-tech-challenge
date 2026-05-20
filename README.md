@@ -2,7 +2,7 @@
 
 ## Scenario
 
-Velora recently launched a new profile registration flow for its fundraising platform. Since the release, a user has reported that the registration form is returning an error. The issue appears intermittent — most users are signing up without problems, but some are consistently hitting failures.
+Velora recently launched a new profile registration flow for its fundraising platform. Since the release, multiple users have reported that the registration form is returning an error. The issue appears intermittent — most users are signing up without problems, but some are consistently hitting failures.
 
 This is an active incident. Your task is to identify the root cause and propose a fix. You are not expected to ship a patch.
 
@@ -12,11 +12,19 @@ This is an active incident. Your task is to identify the root cause and propose 
 
 **Reported by:** Eva Torres (`eva@velora.com`)
 
-> "Hi, I tried to create my Velora profile earlier today and got a generic error message. I thought it was a blip so I tried again, but got the same error. I haven't been able to register at all. Other people on my team signed up fine without any issues."
+> "Hi, I tried to create my Velora profile earlier today and got a generic error message. I thought it was a blip so I tried again, but got the same error. I then tried with my work email instead and still got the same thing. Three attempts, three failures. Other people on my team signed up fine without any issues."
 >
 > — Eva Torres, date of birth 14 June 1987, 12 years of fundraising experience
 
-Eva submitted the form twice. Both attempts returned the same generic error with no further detail.
+Eva attempted twice with `eva@velora.com` and once with a different email address. All three attempts returned the same generic error with no further detail.
+
+**Reported by:** Alex Johnson (`alex@acme.com`)
+
+> "We've been trying to get our team onto Velora all week. I filled out the registration form with my work email and keep getting the same generic error — no explanation. A colleague with fewer years of fundraising experience registered yesterday without any trouble."
+>
+> — Alex Johnson, date of birth 30 March 1988, 11 years of fundraising experience
+
+Alex has retried several times over the past day with the same result.
 
 ---
 
@@ -37,6 +45,8 @@ signups_cache  (id, cache_uuid, email, name, dob, years_fundraising, status, cre
 debug_events   (id, cache_uuid, error_uuid, event_type, payload, metadata, created_at)
 emails_cache   (id, domain, valid, reason, checked_at)
 ```
+
+Historical failed signups are in `signups_cache` and `debug_events`. Start from a reporter email in the tickets above, then use log search with an `error_uuid` if you need the request log line.
 
 ---
 

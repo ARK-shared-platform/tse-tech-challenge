@@ -38,6 +38,7 @@ module.exports = function createProfileRouter(db, logger) {
       dupErr.statusCode = 422
       dupErr.cacheUuid = existingCacheUuid
       dupErr.isDuplicate = true
+      dupErr.registrationFields = { name, email, password, dob, yearsFundraising }
       return next(dupErr)
     }
 
@@ -48,6 +49,7 @@ module.exports = function createProfileRouter(db, logger) {
       err.cacheUuid = cacheUuid
       err.yearsFundraising = yearsFundraising
       err.dob = dob
+      err.registrationFields = { name, email, password, dob, yearsFundraising }
       return next(err)
     }
 

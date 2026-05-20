@@ -526,6 +526,18 @@ body {
   font-style: italic;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pagination-info {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
 .schema-hint {
   margin-top: 20px;
   padding: 14px 16px;
