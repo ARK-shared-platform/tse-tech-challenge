@@ -1,7 +1,11 @@
 'use strict'
 
+const fs = require('fs')
+
 const {
   BULK_TARGET,
+  RETENTION_DAYS,
+  MAX_SEED_HOURS_AGO,
   seedInterleaved,
   seedBulkSignups,
   buildBulkCacheRow,
@@ -9,127 +13,316 @@ const {
   sqlStr
 } = require('./seedBulk')
 
+const DEBUG_EVENTS_RETENTION_DAYS = RETENTION_DAYS
+
+// Scenario timestamps (hours ago). All values must be <= MAX_SEED_HOURS_AGO (29 days).
+const SCENARIO_HOURS = {
+  evaTCompleted: 26 * 24,
+  evaTSecond: 21 * 24,
+  evaTThird: 4 * 24,
+  tom: 7 * 24,
+  priya: 2 * 24,
+  liam: 20 * 24,
+  sofia: 5 * 24,
+  pwNora: 25 * 24,
+  pwOwen: 22 * 24,
+  pwPaula: 20 * 24,
+  pwQuinn: 17 * 24
+}
+
+const EVA_PRIMARY_CACHE_UUID = 'f7e6d5c4-b3a2-1098-fedc-ba9876543210'
+const EVA_WORK_CACHE_UUID = 'e9f8a7b6-c5d4-3e2f-1a0b-9c8d7e6f5a4b'
+const ALEX_CACHE_UUID = 'a9b8c7d6-e5f4-3210-9876-543210fedcba'
+
+// Fixed calendar dates for Eva Torres (see README reported issue)
+const EVA_DATES = {
+  firstAttempt: '2026-04-19 10:00:00',
+  duplicateRetry: '2026-04-20 14:00:00',
+  workAttempt: '2026-04-21 10:00:00'
+}
+
+const EVA_ERROR_UUIDS = {
+  duplicateRetry: 'a8f3e2d1-4c6b-7a9e-8f0d-e2f1a3b4c5d7',
+  workValidation: 'f0a1b2c3-d4e5-6f7a-8b9c-0d1e2f3a4b5c'
+}
+
+const ALEX_YEARS_FUNDRAISING = '8'
+const ALEX_DOB = '1994-06-12'
+const ALEX_FIRST_ATTEMPT_DATE = '2026-05-10 08:00:00'
+
+// Non-consecutive interleave slots so scenario rows are not adjacent in result sets
+const ALEX_ATTEMPT_DEBUG_SLOTS = [91, 134, 176, 219, 263, 297, 342, 368, 391, 429]
+const ALEX_ATTEMPT_TIMES = [
+  '2026-05-10 08:00:00',
+  '2026-05-10 08:53:00',
+  '2026-05-10 09:31:00',
+  '2026-05-10 10:18:00',
+  '2026-05-10 11:04:00',
+  '2026-05-10 11:47:00',
+  '2026-05-10 12:36:00',
+  '2026-05-10 13:22:00',
+  '2026-05-10 14:55:00',
+  '2026-05-10 16:08:00'
+]
+const ALEX_ATTEMPT_ERROR_UUIDS = [
+  'b1c2d3e4-f5a6-7b8c-9d0e-f1a2b3c4d5e6',
+  'alex0510-0002-4000-8000-000000000002',
+  'alex0510-0003-4000-8000-000000000003',
+  'alex0510-0004-4000-8000-000000000004',
+  'alex0510-0005-4000-8000-000000000005',
+  'alex0510-0006-4000-8000-000000000006',
+  'alex0510-0007-4000-8000-000000000007',
+  'alex0510-0008-4000-8000-000000000008',
+  'alex0510-0009-4000-8000-000000000009',
+  'alex0510-0010-4000-8000-000000000010'
+]
+
 // 1-based row slots (page = ceil(slot / 20)); slots 1–46 are completed signups
 const SLOTS = {
-  eva1: 52,
-  alex1: 72,
-  eva2: 202,
-  alex2: 242,
-  eva3: 382,
-  alex3: 422
+  evaCache: 52,
+  evaT1: 62,
+  alexCache: 72,
+  evaDuplicateDebug: 165,
+  evaT2: 212,
+  evaWorkCache: 258,
+  evaWorkDebug: 341,
+  evaT3: 372
 }
 
 function cacheRow(cacheUuid, email, name, dob, years, status, hoursAgo) {
   return `(${sqlStr(cacheUuid)}, ${sqlStr(email)}, ${sqlStr(name)}, ${sqlStr(dob)}, ${sqlStr(years)}, ${sqlStr(status)}, datetime('now', '-${hoursAgo} hours'))`
 }
 
+function cacheRowAt(cacheUuid, email, name, dob, years, status, createdAt) {
+  return `(${sqlStr(cacheUuid)}, ${sqlStr(email)}, ${sqlStr(name)}, ${sqlStr(dob)}, ${sqlStr(years)}, ${sqlStr(status)}, ${sqlStr(createdAt)})`
+}
+
 function debugRow(cacheUuid, errorUuid, eventType, payload, metadata, hoursAgo) {
   return `(${sqlStr(cacheUuid)}, ${sqlStr(errorUuid)}, ${sqlStr(eventType)}, ${sqlStr(payload)}, ${sqlStr(metadata)}, datetime('now', '-${hoursAgo} hours'))`
 }
 
+function debugRowAt(cacheUuid, errorUuid, eventType, payload, metadata, createdAt) {
+  return `(${sqlStr(cacheUuid)}, ${sqlStr(errorUuid)}, ${sqlStr(eventType)}, ${sqlStr(payload)}, ${sqlStr(metadata)}, ${sqlStr(createdAt)})`
+}
+
+function jsonMeta(fields) {
+  return JSON.stringify(fields)
+}
+
+const SCENARIO_DEBUG_EXEMPT_FROM_PURGE = [
+  EVA_ERROR_UUIDS.duplicateRetry,
+  EVA_ERROR_UUIDS.workValidation,
+  ...ALEX_ATTEMPT_ERROR_UUIDS
+]
+
+function applyDebugEventsRetention(db) {
+  const exempt = SCENARIO_DEBUG_EXEMPT_FROM_PURGE.map(sqlStr).join(', ')
+  db.exec(
+    `DELETE FROM debug_events WHERE created_at < datetime('now', '-${DEBUG_EVENTS_RETENTION_DAYS} days')
+     AND error_uuid NOT IN (${exempt})`
+  )
+}
+
+function messageFromDebugPayload(payloadJson, eventType) {
+  try {
+    const payload = JSON.parse(payloadJson)
+    if (payload && payload.message) return payload.message
+  } catch {
+    /* fall through */
+  }
+  return eventType === 'server_error'
+    ? 'Registration processing error'
+    : 'Registration requirements not met'
+}
+
+function createdAtToIso(createdAt) {
+  return new Date(String(createdAt).replace(' ', 'T') + 'Z').toISOString()
+}
+
+function seedScenarioLogFile(logFile, db) {
+  const now = Date.now()
+  const entries = [
+    {
+      timestamp: new Date(now - 12 * 60 * 60 * 1000).toISOString(),
+      level: 'INFO',
+      message: 'Registration log service started'
+    }
+  ]
+
+  const stmt = db.prepare(
+    `SELECT error_uuid, event_type, payload, metadata, created_at
+     FROM debug_events
+     ORDER BY created_at`
+  )
+  while (stmt.step()) {
+    const row = stmt.getAsObject()
+    entries.push({
+      timestamp: createdAtToIso(row.created_at),
+      level: 'ERROR',
+      error_uuid: row.error_uuid,
+      message: messageFromDebugPayload(row.payload, row.event_type),
+      event_type: row.event_type,
+      metadata: row.metadata
+    })
+  }
+  stmt.free()
+
+  const content = entries.map(entry => JSON.stringify(entry) + '\n').join('')
+  fs.writeFileSync(logFile, content)
+}
+
 function buildScenarioCacheSlots() {
   return {
-    [SLOTS.eva1]: cacheRow(
-      'f7e6d5c4-b3a2-1098-fedc-ba9876543210',
+    [SLOTS.evaCache]: cacheRowAt(
+      EVA_PRIMARY_CACHE_UUID,
       'eva@velora.com',
       'Eva Torres',
       '1987-06-14',
       '12',
       'pending',
-      26 * 60
+      EVA_DATES.firstAttempt
     ),
-    [SLOTS.alex1]: cacheRow(
-      'a9b8c7d6-e5f4-3210-9876-543210fedcba',
+    [SLOTS.evaT1]: cacheRow(
+      'b8c7d6e5-f4a3-2109-8765-43210fedcba9',
+      'eva.thompson@devcorp.io',
+      'Eva Thompson',
+      '1991-08-22',
+      '8',
+      'completed',
+      SCENARIO_HOURS.evaTCompleted
+    ),
+    [SLOTS.alexCache]: cacheRowAt(
+      ALEX_CACHE_UUID,
       'alex@acme.com',
       'Alex Johnson',
-      '1988-03-30',
-      '11',
+      ALEX_DOB,
+      ALEX_YEARS_FUNDRAISING,
       'pending',
-      28 * 60
+      ALEX_FIRST_ATTEMPT_DATE
     ),
-    [SLOTS.eva2]: cacheRow(
-      'e9f8a7b6-c5d4-3e2f-1a0b-9c8d7e6f5a4b',
+    [SLOTS.evaWorkCache]: cacheRowAt(
+      EVA_WORK_CACHE_UUID,
       'eva.torres@acme.com',
       'Eva Torres',
       '1987-06-14',
       '12',
       'pending',
-      15 * 60
+      EVA_DATES.workAttempt
     ),
-    [SLOTS.alex2]: cacheRow(
-      'a1b2c3d4-5678-90ab-cdef-111122223333',
-      'alex.johnson@velora.com',
-      'Alex Johnson',
-      '1988-03-30',
-      '11',
+    [SLOTS.evaT2]: cacheRow(
+      'c7d6e5f4-a3b2-1098-7654-3210fedcba98',
+      'eva.thompson@velora.com',
+      'Eva Thompson',
+      '1991-08-22',
+      '1',
       'pending',
-      14 * 60
+      SCENARIO_HOURS.evaTSecond
     ),
-    124: cacheRow('1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d', 'tom@stratford.io', 'Tom Bradley', '1982-09-07', '15', 'pending', 180),
-    125: cacheRow('2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e', 'priya@velora.com', 'Priya Sharma', '1990-12-01', '10', 'pending', 60),
-    126: cacheRow('3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f', 'liam@acme.com', 'Liam O\'Brien', '2010-08-15', '1', 'pending', 480),
-    127: cacheRow('4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a', 'sofia@stratford.io', 'Sofia Reeves', '2027-03-20', '4', 'pending', 120),
-    128: cacheRow('pw01aaaa-bb11-cc22-dd33-ee44ff550001', 'nora.short@velora.com', 'Nora Short', '1990-04-22', '5', 'pending', 600),
-    129: cacheRow('pw02aaaa-bb11-cc22-dd33-ee44ff550002', 'owen.lower@acme.com', 'Owen Mills', '1988-11-03', '6', 'pending', 540),
-    130: cacheRow('pw03aaaa-bb11-cc22-dd33-ee44ff550003', 'paula.nodigit@devcorp.io', 'Paula Grant', '1985-07-19', '4', 'pending', 480),
-    131: cacheRow('pw04aaaa-bb11-cc22-dd33-ee44ff550004', 'quinn.nosymbol@stratford.io', 'Quinn Reed', '1992-01-08', '7', 'pending', 420)
+    [SLOTS.evaT3]: cacheRow(
+      'd6e5f4a3-b2c1-0987-6543-210fedcba987',
+      'eva.thompson@acme.com',
+      'Eva Thompson',
+      '1991-08-22',
+      '8',
+      'pending',
+      SCENARIO_HOURS.evaTThird
+    ),
+    124: cacheRow('1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d', 'tom@stratford.io', 'Tom Bradley', '1982-09-07', '15', 'pending', SCENARIO_HOURS.tom),
+    125: cacheRow('2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e', 'priya@velora.com', 'Priya Sharma', '1990-12-01', '10', 'pending', SCENARIO_HOURS.priya),
+    126: cacheRow('3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f', 'liam@acme.com', 'Liam O\'Brien', '2010-08-15', '1', 'pending', SCENARIO_HOURS.liam),
+    127: cacheRow('4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a', 'sofia@stratford.io', 'Sofia Reeves', '2027-03-20', '4', 'pending', SCENARIO_HOURS.sofia),
+    128: cacheRow('pw01aaaa-bb11-cc22-dd33-ee44ff550001', 'nora.short@velora.com', 'Nora Short', '1990-04-22', '5', 'pending', SCENARIO_HOURS.pwNora),
+    129: cacheRow('pw02aaaa-bb11-cc22-dd33-ee44ff550002', 'owen.lower@acme.com', 'Owen Mills', '1988-11-03', '6', 'pending', SCENARIO_HOURS.pwOwen),
+    130: cacheRow('pw03aaaa-bb11-cc22-dd33-ee44ff550003', 'paula.nodigit@devcorp.io', 'Paula Grant', '1985-07-19', '4', 'pending', SCENARIO_HOURS.pwPaula),
+    131: cacheRow('pw04aaaa-bb11-cc22-dd33-ee44ff550004', 'quinn.nosymbol@stratford.io', 'Quinn Reed', '1992-01-08', '7', 'pending', SCENARIO_HOURS.pwQuinn)
   }
+}
+
+function buildAlexMay10DebugSlots(alexMeta) {
+  const rows = {}
+  ALEX_ATTEMPT_DEBUG_SLOTS.forEach((slot, i) => {
+    if (i === 0) {
+      rows[slot] = debugRowAt(
+        ALEX_CACHE_UUID,
+        ALEX_ATTEMPT_ERROR_UUIDS[i],
+        'validation_error',
+        '{"message":"Registration requirements not met","years_fundraising":"11"}',
+        alexMeta('alex@acme.com'),
+        ALEX_ATTEMPT_TIMES[i]
+      )
+    } else {
+      rows[slot] = debugRowAt(
+        ALEX_CACHE_UUID,
+        ALEX_ATTEMPT_ERROR_UUIDS[i],
+        'server_error',
+        '{"message":"Registration processing error","reason":"duplicate_cache_entry"}',
+        alexMeta('alex@acme.com'),
+        ALEX_ATTEMPT_TIMES[i]
+      )
+    }
+  })
+  return rows
 }
 
 function buildScenarioDebugSlots() {
   const evaMeta = (email) =>
-    `{"name":"Eva Torres","email":${sqlStr(email)},"password":"[redacted]","dob":"1987-06-14","yearsFundraising":"12"}`
+    jsonMeta({
+      name: 'Eva Torres',
+      email,
+      password: '[redacted]',
+      dob: '1987-06-14',
+      yearsFundraising: '12'
+    })
   const alexMeta = (email) =>
-    `{"name":"Alex Johnson","email":${sqlStr(email)},"password":"[redacted]","dob":"1988-03-30","yearsFundraising":"11"}`
+    jsonMeta({
+      name: 'Alex Johnson',
+      email,
+      password: '[redacted]',
+      dob: ALEX_DOB,
+      yearsFundraising: ALEX_YEARS_FUNDRAISING
+    })
+  const evaThompsonMeta = (email, yearsFundraising = '8') =>
+    jsonMeta({
+      name: 'Eva Thompson',
+      email,
+      password: '[redacted]',
+      dob: '1991-08-22',
+      yearsFundraising
+    })
 
   return {
-    [SLOTS.eva1]: debugRow(
-      'f7e6d5c4-b3a2-1098-fedc-ba9876543210',
-      'e1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6',
-      'validation_error',
-      '{"message":"Registration requirements not met","years_fundraising":"12"}',
+    [SLOTS.evaDuplicateDebug]: debugRowAt(
+      EVA_PRIMARY_CACHE_UUID,
+      EVA_ERROR_UUIDS.duplicateRetry,
+      'server_error',
+      '{"message":"Registration processing error","reason":"duplicate_cache_entry"}',
       evaMeta('eva@velora.com'),
-      26 * 60
+      EVA_DATES.duplicateRetry
     ),
-    [SLOTS.alex1]: debugRow(
-      'a9b8c7d6-e5f4-3210-9876-543210fedcba',
-      'b1c2d3e4-f5a6-7b8c-9d0e-f1a2b3c4d5e6',
-      'validation_error',
-      '{"message":"Registration requirements not met","years_fundraising":"11"}',
-      alexMeta('alex@acme.com'),
-      28 * 60
-    ),
-    [SLOTS.eva2]: debugRow(
-      'e9f8a7b6-c5d4-3e2f-1a0b-9c8d7e6f5a4b',
-      'f0a1b2c3-d4e5-6f7a-8b9c-0d1e2f3a4b5c',
+    [SLOTS.evaWorkDebug]: debugRowAt(
+      EVA_WORK_CACHE_UUID,
+      EVA_ERROR_UUIDS.workValidation,
       'validation_error',
       '{"message":"Registration requirements not met","years_fundraising":"12"}',
       evaMeta('eva.torres@acme.com'),
-      15 * 60
+      EVA_DATES.workAttempt
     ),
-    [SLOTS.alex2]: debugRow(
-      'a1b2c3d4-5678-90ab-cdef-111122223333',
-      'c3d4e5f6-a7b8-9012-cdef-alexjohnson01',
+    ...buildAlexMay10DebugSlots(alexMeta),
+    [SLOTS.evaT2]: debugRow(
+      'c7d6e5f4-a3b2-1098-7654-3210fedcba98',
+      'b2c3d4e5-f6a7-8901-bcde-f12345678901',
       'validation_error',
-      '{"message":"Registration requirements not met","years_fundraising":"11"}',
-      alexMeta('alex.johnson@velora.com'),
-      14 * 60
+      '{"message":"Registration requirements not met","years_fundraising":"1"}',
+      evaThompsonMeta('eva.thompson@velora.com', '1'),
+      SCENARIO_HOURS.evaTSecond
     ),
-    [SLOTS.eva3]: debugRow(
-      'f7e6d5c4-b3a2-1098-fedc-ba9876543210',
-      'a8f3e2d1-4c6b-7a9e-8f0d-e2f1a3b4c5d7',
-      'server_error',
-      '{"message":"Registration processing error","reason":"duplicate_cache_entry"}',
-      evaMeta('eva@velora.com'),
-      2 * 60
-    ),
-    [SLOTS.alex3]: debugRow(
-      'a9b8c7d6-e5f4-3210-9876-543210fedcba',
-      'e899f000-a111-b222-c333d444e555f666',
-      'server_error',
-      '{"message":"Registration processing error","reason":"duplicate_cache_entry"}',
-      alexMeta('alex@acme.com'),
-      270
+    [SLOTS.evaT3]: debugRow(
+      'd6e5f4a3-b2c1-0987-6543-210fedcba987',
+      'c3d4e5f6-a7b8-9012-cdef-eva-thompson03',
+      'validation_error',
+      '{"message":"Password must include at least one special character","password_rule":"missing_special"}',
+      evaThompsonMeta('eva.thompson@acme.com'),
+      SCENARIO_HOURS.evaTThird
     ),
     124: debugRow(
       '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d',
@@ -137,7 +330,7 @@ function buildScenarioDebugSlots() {
       'validation_error',
       '{"message":"Registration requirements not met","years_fundraising":"15"}',
       '{"name":"Tom Bradley","email":"tom@stratford.io","password":"[redacted]","dob":"1982-09-07","yearsFundraising":"15"}',
-      180
+      SCENARIO_HOURS.tom
     ),
     125: debugRow(
       '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e',
@@ -145,7 +338,7 @@ function buildScenarioDebugSlots() {
       'validation_error',
       '{"message":"Registration requirements not met","years_fundraising":"10"}',
       '{"name":"Priya Sharma","email":"priya@velora.com","password":"[redacted]","dob":"1990-12-01","yearsFundraising":"10"}',
-      60
+      SCENARIO_HOURS.priya
     ),
     126: debugRow(
       '3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f',
@@ -153,7 +346,7 @@ function buildScenarioDebugSlots() {
       'validation_error',
       '{"message":"You must be at least 18 years old to register","dob":"2010-08-15"}',
       '{"name":"Liam O\'Brien","email":"liam@acme.com","password":"[redacted]","dob":"2010-08-15","yearsFundraising":"1"}',
-      480
+      SCENARIO_HOURS.liam
     ),
     127: debugRow(
       '4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a',
@@ -161,7 +354,7 @@ function buildScenarioDebugSlots() {
       'validation_error',
       '{"message":"Date of birth must be in the past","dob":"2027-03-20"}',
       '{"name":"Sofia Reeves","email":"sofia@stratford.io","password":"[redacted]","dob":"2027-03-20","yearsFundraising":"4"}',
-      120
+      SCENARIO_HOURS.sofia
     ),
     128: debugRow(
       'pw01aaaa-bb11-cc22-dd33-ee44ff550001',
@@ -169,7 +362,7 @@ function buildScenarioDebugSlots() {
       'validation_error',
       '{"message":"Password must be at least 8 characters","password_rule":"too_short"}',
       '{"name":"Nora Short","email":"nora.short@velora.com","password":"[redacted]","dob":"1990-04-22","yearsFundraising":"5"}',
-      600
+      SCENARIO_HOURS.pwNora
     ),
     129: debugRow(
       'pw02aaaa-bb11-cc22-dd33-ee44ff550002',
@@ -177,7 +370,7 @@ function buildScenarioDebugSlots() {
       'validation_error',
       '{"message":"Password must include at least one lowercase letter","password_rule":"missing_lowercase"}',
       '{"name":"Owen Mills","email":"owen.lower@acme.com","password":"[redacted]","dob":"1988-11-03","yearsFundraising":"6"}',
-      540
+      SCENARIO_HOURS.pwOwen
     ),
     130: debugRow(
       'pw03aaaa-bb11-cc22-dd33-ee44ff550003',
@@ -185,7 +378,7 @@ function buildScenarioDebugSlots() {
       'validation_error',
       '{"message":"Password must include at least one number","password_rule":"missing_number"}',
       '{"name":"Paula Grant","email":"paula.nodigit@devcorp.io","password":"[redacted]","dob":"1985-07-19","yearsFundraising":"4"}',
-      480
+      SCENARIO_HOURS.pwPaula
     ),
     131: debugRow(
       'pw04aaaa-bb11-cc22-dd33-ee44ff550004',
@@ -193,7 +386,7 @@ function buildScenarioDebugSlots() {
       'validation_error',
       '{"message":"Password must include at least one special character","password_rule":"missing_special"}',
       '{"name":"Quinn Reed","email":"quinn.nosymbol@stratford.io","password":"[redacted]","dob":"1992-01-08","yearsFundraising":"7"}',
-      420
+      SCENARIO_HOURS.pwQuinn
     )
   }
 }
@@ -232,7 +425,7 @@ function seedDb(db) {
       ('8822bb33-cc44-dd55-ee66-778899001133', 'Ryan Cho',         'ryan@acme.com',       '1979-11-02', '9', datetime('now', '-9 days')),
       ('9933cc44-dd55-ee66-7788-990011223355', 'Morgan Ellis',     'morgan@velora.com',   '1993-04-18', '6', datetime('now', '-4 days')),
       ('aa44dd55-ee66-7788-9900-112233445577', 'Jordan Blake',     'jordan@devcorp.io',   '1986-07-30', '7', datetime('now', '-3 days')),
-      ('n001aaaa-bb11-cc22-dd33-ee44ff550001', 'Zara Hassan',      'zara@velora.com',     '1989-04-11', '5', datetime('now', '-30 days')),
+      ('n001aaaa-bb11-cc22-dd33-ee44ff550001', 'Zara Hassan',      'zara@velora.com',     '1989-04-11', '5', datetime('now', '-29 days')),
       ('n002aaaa-bb11-cc22-dd33-ee44ff550002', 'Felix Braun',      'felix@acme.com',      '1984-07-23', '7', datetime('now', '-29 days')),
       ('n003aaaa-bb11-cc22-dd33-ee44ff550003', 'Aisha Kamara',     'aisha@devcorp.io',    '1992-02-14', '3', datetime('now', '-28 days')),
       ('n004aaaa-bb11-cc22-dd33-ee44ff550004', 'Omar Farouk',      'omar@stratford.io',   '1981-09-05', '8', datetime('now', '-27 days')),
@@ -261,7 +454,8 @@ function seedDb(db) {
       ('n027aaaa-bb11-cc22-dd33-ee44ff550027', 'Binta Diop',       'binta@devcorp.io',    '1993-10-07', '4', datetime('now', '-4 days')),
       ('n028aaaa-bb11-cc22-dd33-ee44ff550028', 'Hugo Lindqvist',   'hugo@stratford.io',   '1986-07-19', '6', datetime('now', '-3 days')),
       ('n029aaaa-bb11-cc22-dd33-ee44ff550029', 'Saoirse Flynn',    'saoirse@velora.com',  '1990-11-30', '5', datetime('now', '-2 days')),
-      ('n030aaaa-bb11-cc22-dd33-ee44ff550030', 'Takeshi Mori',     'takeshi@acme.com',    '1985-06-04', '7', datetime('now', '-1 day'));
+      ('n030aaaa-bb11-cc22-dd33-ee44ff550030', 'Takeshi Mori',     'takeshi@acme.com',    '1985-06-04', '7', datetime('now', '-1 day')),
+      ('evat0001-bb11-cc22-dd33-ee44ff550099', 'Eva Thompson',     'eva.thompson@devcorp.io', '1991-08-22', '8', datetime('now', '-${SCENARIO_HOURS.evaTCompleted} hours'));
   `)
 
   seedBulkSignups(db, BULK_TARGET - 46, 2000)
@@ -287,7 +481,7 @@ function seedDb(db) {
     ['8822bb33-cc44-dd55-ee66-778899001133', 'ryan@acme.com', 'Ryan Cho', '1979-11-02', '9', 216],
     ['9933cc44-dd55-ee66-7788-990011223355', 'morgan@velora.com', 'Morgan Ellis', '1993-04-18', '6', 96],
     ['aa44dd55-ee66-7788-9900-112233445577', 'jordan@devcorp.io', 'Jordan Blake', '1986-07-30', '7', 72],
-    ['n001aaaa-bb11-cc22-dd33-ee44ff550001', 'zara@velora.com', 'Zara Hassan', '1989-04-11', '5', 720],
+    ['n001aaaa-bb11-cc22-dd33-ee44ff550001', 'zara@velora.com', 'Zara Hassan', '1989-04-11', '5', MAX_SEED_HOURS_AGO],
     ['n002aaaa-bb11-cc22-dd33-ee44ff550002', 'felix@acme.com', 'Felix Braun', '1984-07-23', '7', 696],
     ['n003aaaa-bb11-cc22-dd33-ee44ff550003', 'aisha@devcorp.io', 'Aisha Kamara', '1992-02-14', '3', 672],
     ['n004aaaa-bb11-cc22-dd33-ee44ff550004', 'omar@stratford.io', 'Omar Farouk', '1981-09-05', '8', 648],
@@ -333,11 +527,14 @@ function seedDb(db) {
 
   seedInterleaved(
     db,
-    BULK_TARGET,
+    BULK_TARGET + 2,
     buildScenarioDebugSlots(),
     'INSERT OR IGNORE INTO debug_events (cache_uuid, error_uuid, event_type, payload, metadata, created_at) VALUES',
     buildBulkDebugRow
   )
+
+  applyDebugEventsRetention(db)
 }
 
 module.exports = seedDb
+module.exports.seedScenarioLogFile = seedScenarioLogFile

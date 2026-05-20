@@ -4,8 +4,18 @@ const { uniqueNamesGenerator, names } = require('unique-names-generator')
 
 const DOMAINS = ['velora.com', 'acme.com', 'devcorp.io', 'stratford.io']
 
+const RETENTION_DAYS = 30
 const BULK_TARGET = 460
 const BATCH_SIZE = 50
+const RETENTION_HOURS = RETENTION_DAYS * 24
+const MIN_SEED_HOURS_AGO = 12
+// Keep seeded rows inside the debug_events purge window (30 days).
+const MAX_SEED_HOURS_AGO = RETENTION_HOURS - 24
+
+function hoursAgoWithinRetention(n) {
+  const span = MAX_SEED_HOURS_AGO - MIN_SEED_HOURS_AGO
+  return MIN_SEED_HOURS_AGO + (n % (span + 1))
+}
 
 function pad(n, len) {
   return String(n).padStart(len, '0')
@@ -35,7 +45,7 @@ function personAt(n) {
   const day = pad((n % 28) + 1, 2)
   const dob = `${year}-${month}-${day}`
   const years = String((n % 9) + 1)
-  const hoursAgo = 12 + (n % 720)
+  const hoursAgo = hoursAgoWithinRetention(n)
   return { name, email, dob, years, hoursAgo, domain }
 }
 
@@ -124,6 +134,10 @@ function seedBulkDebugEvents(db, count, startIndex = 5000) {
 
 module.exports = {
   BULK_TARGET,
+  RETENTION_DAYS,
+  RETENTION_HOURS,
+  MIN_SEED_HOURS_AGO,
+  MAX_SEED_HOURS_AGO,
   seedInterleaved,
   seedBulkSignups,
   seedBulkSignupsCache,

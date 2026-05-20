@@ -412,6 +412,20 @@ body {
   margin-bottom: 8px;
 }
 
+.log-metadata {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  margin: 0;
+}
+
 .log-stack {
   font-family: var(--mono);
   font-size: 12px;
@@ -561,4 +575,35 @@ body {
   color: var(--text-2);
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+.retention-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: 6px;
+}
+
+.retention-notice-icon {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--warn) 55%, transparent);
+}
+
+.retention-notice-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--warn) 70%, var(--text-2));
+}
+
+.retention-notice-text code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: color-mix(in srgb, var(--warn) 65%, var(--text-2));
 }
