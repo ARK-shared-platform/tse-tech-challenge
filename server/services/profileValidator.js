@@ -26,13 +26,54 @@ function validateProfile(db, fields) {
     throw new ValidationError('A valid email address is required')
   }
 
-  if (!password || password.length < 8) {
-    throw new ValidationError('Password must be at least 8 characters')
-  }
-
+  validatePassword(password)
   validateDateOfBirth(dob)
   validateEmailDomain(db, email)
   validateYearsFundraising(yearsFundraising)
+}
+
+function passwordValidationError(message, passwordRule) {
+  const err = new ValidationError(message)
+  err.passwordRule = passwordRule
+  return err
+}
+
+function validatePassword(password) {
+  if (!password || typeof password !== 'string') {
+    throw passwordValidationError('Password is required', 'required')
+  }
+
+  if (password.length < 8) {
+    throw passwordValidationError('Password must be at least 8 characters', 'too_short')
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    throw passwordValidationError(
+      'Password must include at least one uppercase letter',
+      'missing_uppercase'
+    )
+  }
+
+  if (!/[a-z]/.test(password)) {
+    throw passwordValidationError(
+      'Password must include at least one lowercase letter',
+      'missing_lowercase'
+    )
+  }
+
+  if (!/[0-9]/.test(password)) {
+    throw passwordValidationError(
+      'Password must include at least one number',
+      'missing_number'
+    )
+  }
+
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    throw passwordValidationError(
+      'Password must include at least one special character',
+      'missing_special'
+    )
+  }
 }
 
 function validateDateOfBirth(dob) {

@@ -7,11 +7,14 @@ signups_cache  (id, cache_uuid, email, name, dob, years_fundraising, status, cre
 debug_events   (id, cache_uuid, error_uuid, event_type, payload, metadata, created_at)
 emails_cache   (id, domain, valid, reason, checked_at)`
 
+const PAGE_SIZE = 20
+
 export default function SqlPage() {
   const [query, setQuery] = useState(DEFAULT_QUERY)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(0)
 
   async function handleRun(e) {
     e.preventDefault()
@@ -30,6 +33,7 @@ export default function SqlPage() {
         setError(data.error)
       } else {
         setResult(data)
+        setPage(0)
       }
     } catch {
       setError('Failed to run query.')
@@ -66,40 +70,68 @@ export default function SqlPage() {
           </div>
         )}
 
-        {result && (
-          <div className="sql-results">
-            <p className="result-count">
-              {result.rows.length} row{result.rows.length !== 1 ? 's' : ''} returned
-            </p>
-            {result.rows.length > 0 && (
-              <div className="table-wrapper">
-                <table className="sql-table">
-                  <thead>
-                    <tr>
-                      {result.columns.map(col => (
-                        <th key={col}>{col}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.rows.map((row, i) => (
-                      <tr key={i}>
-                        {result.columns.map(col => (
-                          <td key={col} title={row[col] !== null ? String(row[col]) : 'NULL'}>
-                            {row[col] === null
-                              ? <span className="null-val">NULL</span>
-                              : String(row[col])
-                            }
-                          </td>
+        {result && (() => {
+          const totalPages = Math.ceil(result.rows.length / PAGE_SIZE)
+          const pageRows = result.rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+          return (
+            <div className="sql-results">
+              <p className="result-count">
+                {result.rows.length} row{result.rows.length !== 1 ? 's' : ''} returned
+                {totalPages > 1 && ` — page ${page + 1} of ${totalPages}`}
+              </p>
+              {result.rows.length > 0 && (
+                <>
+                  <div className="table-wrapper">
+                    <table className="sql-table">
+                      <thead>
+                        <tr>
+                          {result.columns.map(col => (
+                            <th key={col}>{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pageRows.map((row, i) => (
+                          <tr key={i}>
+                            {result.columns.map(col => (
+                              <td key={col} title={row[col] !== null ? String(row[col]) : 'NULL'}>
+                                {row[col] === null
+                                  ? <span className="null-val">NULL</span>
+                                  : String(row[col])
+                                }
+                              </td>
+                            ))}
+                          </tr>
                         ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="pagination">
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => setPage(p => p - 1)}
+                        disabled={page === 0}
+                      >
+                        Previous
+                      </button>
+                      <span className="pagination-info">
+                        Rows {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, result.rows.length)}
+                      </span>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => setPage(p => p + 1)}
+                        disabled={page >= totalPages - 1}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })()}
 
         <div className="schema-hint">
           <p className="schema-hint-title">Available tables</p>

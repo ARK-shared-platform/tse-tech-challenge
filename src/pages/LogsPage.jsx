@@ -1,35 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 export default function LogsPage() {
   const [errorId, setErrorId] = useState('')
   const [entries, setEntries] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [mode, setMode] = useState('recent') // 'recent' | 'search'
-
-  useEffect(() => {
-    loadRecent()
-  }, [])
-
-  async function loadRecent() {
-    setLoading(true)
-    setMode('recent')
-    try {
-      const res = await fetch('/api/logs/recent')
-      const data = await res.json()
-      setEntries(data.entries || [])
-    } catch {
-      setEntries([])
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function handleSearch(e) {
     e.preventDefault()
     if (!errorId.trim()) return
 
     setLoading(true)
-    setMode('search')
     try {
       const res = await fetch('/api/logs/search', {
         method: 'POST',
@@ -50,7 +30,7 @@ export default function LogsPage() {
       <div className="card">
         <div className="card-header">
           <h1 className="page-title">Log search</h1>
-          <p className="page-subtitle">Browse recent errors or search by error UUID.</p>
+          <p className="page-subtitle">Search log entries by error UUID.</p>
         </div>
 
         <form onSubmit={handleSearch} className="search-form">
@@ -64,15 +44,7 @@ export default function LogsPage() {
             autoComplete="off"
           />
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading && mode === 'search' ? 'Searching...' : 'Search'}
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={loadRecent}
-            disabled={loading}
-          >
-            Recent errors
+            {loading ? 'Searching...' : 'Search'}
           </button>
         </form>
 
@@ -83,7 +55,7 @@ export default function LogsPage() {
             ) : (
               <>
                 <p className="result-count" style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--text-2)' }}>
-                  {mode === 'recent' ? `${entries.length} recent error${entries.length !== 1 ? 's' : ''}` : `${entries.length} result${entries.length !== 1 ? 's' : ''}`}
+                  {entries.length} result{entries.length !== 1 ? 's' : ''}
                 </p>
                 {entries.map((entry, i) => (
                   <div key={i} className={`log-entry log-${(entry.level || 'info').toLowerCase()}`}>

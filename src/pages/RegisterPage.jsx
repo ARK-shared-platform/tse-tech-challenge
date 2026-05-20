@@ -110,7 +110,7 @@ export default function RegisterPage() {
               className="form-input"
               value={form.password}
               onChange={handleChange}
-              placeholder="Minimum 8 characters"
+              placeholder="8+ chars with upper, lower, number, symbol"
               required
             />
           </div>
