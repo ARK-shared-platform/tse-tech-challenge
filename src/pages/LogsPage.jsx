@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 function formatJsonField(value) {
   if (value == null || value === '') return null
@@ -13,20 +14,21 @@ function formatJsonField(value) {
 }
 
 export default function LogsPage() {
+  const [searchParams] = useSearchParams()
   const [errorId, setErrorId] = useState('')
   const [entries, setEntries] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  async function handleSearch(e) {
-    e.preventDefault()
-    if (!errorId.trim()) return
+  const runSearch = useCallback(async (id) => {
+    const trimmed = id.trim()
+    if (!trimmed) return
 
     setLoading(true)
     try {
       const res = await fetch('/api/logs/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ errorId: errorId.trim() })
+        body: JSON.stringify({ errorId: trimmed })
       })
       const data = await res.json()
       setEntries(data.entries || [])
@@ -35,6 +37,19 @@ export default function LogsPage() {
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('error_uuid')
+    if (fromUrl) {
+      setErrorId(fromUrl)
+      runSearch(fromUrl)
+    }
+  }, [searchParams, runSearch])
+
+  async function handleSearch(e) {
+    e.preventDefault()
+    await runSearch(errorId)
   }
 
   return (
