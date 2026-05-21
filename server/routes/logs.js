@@ -11,17 +11,20 @@ module.exports = function createLogsRouter(logFile, db) {
     return rest
   }
 
-  function lookupMetadata(errorUuid) {
+  function lookupDebugEvent(errorUuid) {
     const stmt = db.prepare(
-      'SELECT metadata FROM debug_events WHERE error_uuid = ? LIMIT 1'
+      'SELECT metadata, payload FROM debug_events WHERE error_uuid = ? LIMIT 1'
     )
     stmt.bind([errorUuid])
     let metadata = null
+    let payload = null
     if (stmt.step()) {
-      metadata = stmt.getAsObject().metadata
+      const row = stmt.getAsObject()
+      metadata = row.metadata
+      payload = row.payload
     }
     stmt.free()
-    return metadata
+    return { metadata, payload }
   }
 
   function readAllEntries() {
@@ -42,12 +45,13 @@ module.exports = function createLogsRouter(logFile, db) {
     }
 
     const trimmedId = errorId.trim()
-    const metadata = lookupMetadata(trimmedId)
+    const { metadata, payload } = lookupDebugEvent(trimmedId)
     const matches = readAllEntries()
       .filter(e => e.error_uuid === trimmedId)
       .map(entry => ({
         ...entry,
-        metadata: entry.metadata ?? metadata
+        metadata: entry.metadata ?? metadata,
+        payload: entry.payload ?? payload
       }))
     res.json({ entries: matches })
   })

@@ -73,6 +73,7 @@ export default function SqlPage() {
         {result && (() => {
           const totalPages = Math.ceil(result.rows.length / PAGE_SIZE)
           const pageRows = result.rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+          const showLogsColumn = result.columns.includes('error_uuid')
           return (
             <div className="sql-results">
               <p className="result-count">
@@ -88,6 +89,7 @@ export default function SqlPage() {
                           {result.columns.map(col => (
                             <th key={col}>{col}</th>
                           ))}
+                          {showLogsColumn && <th className="sql-table-logs-col" />}
                         </tr>
                       </thead>
                       <tbody>
@@ -101,6 +103,20 @@ export default function SqlPage() {
                                 }
                               </td>
                             ))}
+                            {showLogsColumn && (
+                              <td className="sql-table-logs-col">
+                                {row.error_uuid ? (
+                                  <a
+                                    href={`/logs?error_uuid=${encodeURIComponent(String(row.error_uuid))}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-primary btn-compact"
+                                  >
+                                    Open in logs
+                                  </a>
+                                ) : null}
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>

@@ -115,6 +115,7 @@ function insertFailedSignup(db, logger, person) {
     error_uuid: errorUuid,
     message,
     event_type: 'validation_error',
+    payload: JSON.stringify(payload),
     metadata
   })
 }

@@ -12,8 +12,10 @@ This is an active incident. Your task is to identify the root cause and propose 
 
 **Reported by:** Eva Torres (`eva@velora.com`)
 
-> "Hi, on 19 April I tried to create my Velora profile with `eva@velora.com` and got a generic error message, no details, nothing useful. I tried again on 20 April with the same email and got the same error. On 21 April I tried with my work email, `eva.torres@acme.com`, and still got the same thing. Three attempts, three failures, and I'm stuck. My whole team is waiting on me to get set up, and everyone else signed up fine. This is really frustrating; can someone please look into why this keeps happening to me?"
->
+<!-- EVA_REPORT:START -->
+> "Hi, on 19 April I tried to create my Velora profile with `eva@velora.com` and got a generic error message, no details, nothing useful. I tried again on 21 April with the same email and got the same error. On 22 April I tried with my work email, `eva.torres@acme.com`, and still got the same thing. Three attempts, three failures, and I'm stuck. My whole team is waiting on me to get set up, and everyone else signed up fine. This is really frustrating; can someone please look into why this keeps happening to me?"
+<!-- EVA_REPORT:END -->
+
 > — Eva Torres, date of birth 14 June 1987, 12 years of fundraising experience
 
 ---
@@ -36,9 +38,14 @@ debug_events   (id, cache_uuid, error_uuid, event_type, payload, metadata, creat
 emails_cache   (id, domain, valid, reason, checked_at)
 ```
 
-`signups`, `signups_cache`, and `emails_cache` retain full history. **`debug_events` only keeps the last 30 days**; older diagnostic rows are purged automatically.
+| Table | What it holds |
+|---|---|
+| `signups` | Completed registrations |
+| `signups_cache` | Pending (incomplete) and completed registrations |
+| `debug_events` | Error logs — same data as grepping `server/logs/app.log` |
+| `emails_cache` | Cache of email domains and their validity |
 
-Pending and completed signups stay in `signups_cache`. Recent failures appear in `debug_events` while they are within the 30-day window. Start from a reporter email in the tickets above, then follow the `error_uuid` into log search when one is available.
+`signups`, `signups_cache`, and `emails_cache` retain full history. **`debug_events` only keeps the last 30 days**; older rows are purged automatically.
 
 ---
 

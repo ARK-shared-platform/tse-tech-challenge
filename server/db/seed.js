@@ -5,41 +5,40 @@ const fs = require('fs')
 const {
   BULK_TARGET,
   RETENTION_DAYS,
-  MAX_SEED_HOURS_AGO,
   seedInterleaved,
   seedBulkSignups,
   buildBulkCacheRow,
   buildBulkDebugRow,
-  sqlStr
+  sqlStr,
+  formatSqlTimestamp,
+  atDaysAgoAtTime,
+  hoursAgoForDays,
+  volumeSignupHoursAgo
 } = require('./seedBulk')
+const { getEvaScenario } = require('../scenario/evaDates')
 
 const DEBUG_EVENTS_RETENTION_DAYS = RETENTION_DAYS
 
 // Scenario timestamps (hours ago). All values must be <= MAX_SEED_HOURS_AGO (29 days).
 const SCENARIO_HOURS = {
-  evaTCompleted: 26 * 24,
-  evaTSecond: 21 * 24,
-  evaTThird: 4 * 24,
-  tom: 7 * 24,
-  priya: 2 * 24,
-  liam: 20 * 24,
-  sofia: 5 * 24,
-  pwNora: 25 * 24,
-  pwOwen: 22 * 24,
-  pwPaula: 20 * 24,
-  pwQuinn: 17 * 24
+  evaTCompleted: hoursAgoForDays(26),
+  evaTSecond: hoursAgoForDays(21),
+  evaTThird: hoursAgoForDays(4),
+  tom: hoursAgoForDays(7),
+  priya: hoursAgoForDays(2),
+  liam: hoursAgoForDays(20),
+  sofia: hoursAgoForDays(5),
+  pwNora: hoursAgoForDays(25),
+  pwOwen: hoursAgoForDays(22),
+  pwPaula: hoursAgoForDays(20),
+  pwQuinn: hoursAgoForDays(17)
 }
 
 const EVA_PRIMARY_CACHE_UUID = 'f7e6d5c4-b3a2-1098-fedc-ba9876543210'
 const EVA_WORK_CACHE_UUID = 'e9f8a7b6-c5d4-3e2f-1a0b-9c8d7e6f5a4b'
 const ALEX_CACHE_UUID = 'a9b8c7d6-e5f4-3210-9876-543210fedcba'
 
-// Fixed calendar dates for Eva Torres (see README reported issue)
-const EVA_DATES = {
-  firstAttempt: '2026-04-19 10:00:00',
-  duplicateRetry: '2026-04-20 14:00:00',
-  workAttempt: '2026-04-21 10:00:00'
-}
+const { dates: EVA_DATES } = getEvaScenario()
 
 const EVA_ERROR_UUIDS = {
   duplicateRetry: 'a8f3e2d1-4c6b-7a9e-8f0d-e2f1a3b4c5d7',
@@ -48,22 +47,20 @@ const EVA_ERROR_UUIDS = {
 
 const ALEX_YEARS_FUNDRAISING = '8'
 const ALEX_DOB = '1994-06-12'
-const ALEX_FIRST_ATTEMPT_DATE = '2026-05-10 08:00:00'
+const ALEX_DAYS_AGO = 15
+const ALEX_ATTEMPT_MINUTE_OFFSETS = [0, 53, 91, 138, 184, 227, 276, 322, 415, 488]
 
+function getAlexAttemptTimes(referenceDate = new Date()) {
+  const base = atDaysAgoAtTime(ALEX_DAYS_AGO, 8, 0, referenceDate)
+  return ALEX_ATTEMPT_MINUTE_OFFSETS.map((minutes) =>
+    formatSqlTimestamp(new Date(base.getTime() + minutes * 60 * 1000))
+  )
+}
+
+const ALEX_ATTEMPT_TIMES = getAlexAttemptTimes()
+const ALEX_FIRST_ATTEMPT_DATE = ALEX_ATTEMPT_TIMES[0]
 // Non-consecutive interleave slots so scenario rows are not adjacent in result sets
 const ALEX_ATTEMPT_DEBUG_SLOTS = [91, 134, 176, 219, 263, 297, 342, 368, 391, 429]
-const ALEX_ATTEMPT_TIMES = [
-  '2026-05-10 08:00:00',
-  '2026-05-10 08:53:00',
-  '2026-05-10 09:31:00',
-  '2026-05-10 10:18:00',
-  '2026-05-10 11:04:00',
-  '2026-05-10 11:47:00',
-  '2026-05-10 12:36:00',
-  '2026-05-10 13:22:00',
-  '2026-05-10 14:55:00',
-  '2026-05-10 16:08:00'
-]
 const ALEX_ATTEMPT_ERROR_UUIDS = [
   'b1c2d3e4-f5a6-7b8c-9d0e-f1a2b3c4d5e6',
   'alex0510-0002-4000-8000-000000000002',
@@ -162,6 +159,7 @@ function seedScenarioLogFile(logFile, db) {
       error_uuid: row.error_uuid,
       message: messageFromDebugPayload(row.payload, row.event_type),
       event_type: row.event_type,
+      payload: row.payload,
       metadata: row.metadata
     })
   }
@@ -207,7 +205,7 @@ function buildScenarioCacheSlots() {
       '1987-06-14',
       '12',
       'pending',
-      EVA_DATES.workAttempt
+      EVA_DATES.thirdAttempt
     ),
     [SLOTS.evaT2]: cacheRow(
       'c7d6e5f4-a3b2-1098-7654-3210fedcba98',
@@ -297,7 +295,7 @@ function buildScenarioDebugSlots() {
       'server_error',
       '{"message":"Registration processing error","reason":"duplicate_cache_entry"}',
       evaMeta('eva@velora.com'),
-      EVA_DATES.duplicateRetry
+      EVA_DATES.secondAttempt
     ),
     [SLOTS.evaWorkDebug]: debugRowAt(
       EVA_WORK_CACHE_UUID,
@@ -305,7 +303,7 @@ function buildScenarioDebugSlots() {
       'validation_error',
       '{"message":"Registration requirements not met","years_fundraising":"12"}',
       evaMeta('eva.torres@acme.com'),
-      EVA_DATES.workAttempt
+      EVA_DATES.thirdAttempt
     ),
     ...buildAlexMay10DebugSlots(alexMeta),
     [SLOTS.evaT2]: debugRow(
@@ -481,36 +479,36 @@ function seedDb(db) {
     ['8822bb33-cc44-dd55-ee66-778899001133', 'ryan@acme.com', 'Ryan Cho', '1979-11-02', '9', 216],
     ['9933cc44-dd55-ee66-7788-990011223355', 'morgan@velora.com', 'Morgan Ellis', '1993-04-18', '6', 96],
     ['aa44dd55-ee66-7788-9900-112233445577', 'jordan@devcorp.io', 'Jordan Blake', '1986-07-30', '7', 72],
-    ['n001aaaa-bb11-cc22-dd33-ee44ff550001', 'zara@velora.com', 'Zara Hassan', '1989-04-11', '5', MAX_SEED_HOURS_AGO],
-    ['n002aaaa-bb11-cc22-dd33-ee44ff550002', 'felix@acme.com', 'Felix Braun', '1984-07-23', '7', 696],
-    ['n003aaaa-bb11-cc22-dd33-ee44ff550003', 'aisha@devcorp.io', 'Aisha Kamara', '1992-02-14', '3', 672],
-    ['n004aaaa-bb11-cc22-dd33-ee44ff550004', 'omar@stratford.io', 'Omar Farouk', '1981-09-05', '8', 648],
-    ['n005aaaa-bb11-cc22-dd33-ee44ff550005', 'claire@velora.com', 'Claire Dubois', '1995-11-17', '2', 624],
-    ['n006aaaa-bb11-cc22-dd33-ee44ff550006', 'elias@acme.com', 'Elias Stern', '1987-06-08', '6', 600],
-    ['n007aaaa-bb11-cc22-dd33-ee44ff550007', 'leila@devcorp.io', 'Leila Nazari', '1993-08-29', '4', 576],
-    ['n008aaaa-bb11-cc22-dd33-ee44ff550008', 'dmitri@stratford.io', 'Dmitri Volkov', '1979-12-01', '9', 552],
-    ['n009aaaa-bb11-cc22-dd33-ee44ff550009', 'yuki@velora.com', 'Yuki Tanaka', '1991-03-20', '5', 528],
-    ['n010aaaa-bb11-cc22-dd33-ee44ff550010', 'pedro@acme.com', 'Pedro Alves', '1986-10-14', '7', 504],
-    ['n011aaaa-bb11-cc22-dd33-ee44ff550011', 'ingrid@devcorp.io', 'Ingrid Larsson', '1994-05-03', '3', 480],
-    ['n012aaaa-bb11-cc22-dd33-ee44ff550012', 'kwame@stratford.io', 'Kwame Asante', '1983-01-28', '8', 456],
-    ['n013aaaa-bb11-cc22-dd33-ee44ff550013', 'amara@velora.com', 'Amara Diallo', '1990-07-16', '6', 432],
-    ['n014aaaa-bb11-cc22-dd33-ee44ff550014', 'stefan@acme.com', 'Stefan Koch', '1985-04-07', '7', 408],
-    ['n015aaaa-bb11-cc22-dd33-ee44ff550015', 'nadia@devcorp.io', 'Nadia Petrov', '1996-09-22', '2', 384],
-    ['n016aaaa-bb11-cc22-dd33-ee44ff550016', 'ravi@stratford.io', 'Ravi Menon', '1982-06-30', '9', 360],
-    ['n017aaaa-bb11-cc22-dd33-ee44ff550017', 'chloe@velora.com', 'Chloe Bernard', '1993-12-18', '4', 336],
-    ['n018aaaa-bb11-cc22-dd33-ee44ff550018', 'tobias@acme.com', 'Tobias Fischer', '1980-02-25', '8', 312],
-    ['n019aaaa-bb11-cc22-dd33-ee44ff550019', 'yasmin@devcorp.io', 'Yasmin Osei', '1988-11-09', '5', 288],
-    ['n020aaaa-bb11-cc22-dd33-ee44ff550020', 'leon@stratford.io', 'Leon Hoffmann', '1991-07-04', '6', 264],
-    ['n021aaaa-bb11-cc22-dd33-ee44ff550021', 'adaeze@velora.com', 'Adaeze Eze', '1984-03-13', '7', 240],
-    ['n022aaaa-bb11-cc22-dd33-ee44ff550022', 'simon@acme.com', 'Simon Carter', '1989-08-01', '5', 216],
-    ['n023aaaa-bb11-cc22-dd33-ee44ff550023', 'freya@devcorp.io', 'Freya Nielsen', '1995-05-26', '3', 192],
-    ['n024aaaa-bb11-cc22-dd33-ee44ff550024', 'kofi@stratford.io', 'Kofi Mensah', '1987-01-15', '8', 168],
-    ['n025aaaa-bb11-cc22-dd33-ee44ff550025', 'mei@velora.com', 'Mei Lin', '1992-09-11', '4', 144],
-    ['n026aaaa-bb11-cc22-dd33-ee44ff550026', 'andre@acme.com', 'Andre Moreau', '1981-04-22', '9', 120],
-    ['n027aaaa-bb11-cc22-dd33-ee44ff550027', 'binta@devcorp.io', 'Binta Diop', '1993-10-07', '4', 96],
-    ['n028aaaa-bb11-cc22-dd33-ee44ff550028', 'hugo@stratford.io', 'Hugo Lindqvist', '1986-07-19', '6', 72],
-    ['n029aaaa-bb11-cc22-dd33-ee44ff550029', 'saoirse@velora.com', 'Saoirse Flynn', '1990-11-30', '5', 48],
-    ['n030aaaa-bb11-cc22-dd33-ee44ff550030', 'takeshi@acme.com', 'Takeshi Mori', '1985-06-04', '7', 24]
+    ['n001aaaa-bb11-cc22-dd33-ee44ff550001', 'zara@velora.com', 'Zara Hassan', '1989-04-11', '5', volumeSignupHoursAgo(1)],
+    ['n002aaaa-bb11-cc22-dd33-ee44ff550002', 'felix@acme.com', 'Felix Braun', '1984-07-23', '7', volumeSignupHoursAgo(2)],
+    ['n003aaaa-bb11-cc22-dd33-ee44ff550003', 'aisha@devcorp.io', 'Aisha Kamara', '1992-02-14', '3', volumeSignupHoursAgo(3)],
+    ['n004aaaa-bb11-cc22-dd33-ee44ff550004', 'omar@stratford.io', 'Omar Farouk', '1981-09-05', '8', volumeSignupHoursAgo(4)],
+    ['n005aaaa-bb11-cc22-dd33-ee44ff550005', 'claire@velora.com', 'Claire Dubois', '1995-11-17', '2', volumeSignupHoursAgo(5)],
+    ['n006aaaa-bb11-cc22-dd33-ee44ff550006', 'elias@acme.com', 'Elias Stern', '1987-06-08', '6', volumeSignupHoursAgo(6)],
+    ['n007aaaa-bb11-cc22-dd33-ee44ff550007', 'leila@devcorp.io', 'Leila Nazari', '1993-08-29', '4', volumeSignupHoursAgo(7)],
+    ['n008aaaa-bb11-cc22-dd33-ee44ff550008', 'dmitri@stratford.io', 'Dmitri Volkov', '1979-12-01', '9', volumeSignupHoursAgo(8)],
+    ['n009aaaa-bb11-cc22-dd33-ee44ff550009', 'yuki@velora.com', 'Yuki Tanaka', '1991-03-20', '5', volumeSignupHoursAgo(9)],
+    ['n010aaaa-bb11-cc22-dd33-ee44ff550010', 'pedro@acme.com', 'Pedro Alves', '1986-10-14', '7', volumeSignupHoursAgo(10)],
+    ['n011aaaa-bb11-cc22-dd33-ee44ff550011', 'ingrid@devcorp.io', 'Ingrid Larsson', '1994-05-03', '3', volumeSignupHoursAgo(11)],
+    ['n012aaaa-bb11-cc22-dd33-ee44ff550012', 'kwame@stratford.io', 'Kwame Asante', '1983-01-28', '8', volumeSignupHoursAgo(12)],
+    ['n013aaaa-bb11-cc22-dd33-ee44ff550013', 'amara@velora.com', 'Amara Diallo', '1990-07-16', '6', volumeSignupHoursAgo(13)],
+    ['n014aaaa-bb11-cc22-dd33-ee44ff550014', 'stefan@acme.com', 'Stefan Koch', '1985-04-07', '7', volumeSignupHoursAgo(14)],
+    ['n015aaaa-bb11-cc22-dd33-ee44ff550015', 'nadia@devcorp.io', 'Nadia Petrov', '1996-09-22', '2', volumeSignupHoursAgo(15)],
+    ['n016aaaa-bb11-cc22-dd33-ee44ff550016', 'ravi@stratford.io', 'Ravi Menon', '1982-06-30', '9', volumeSignupHoursAgo(16)],
+    ['n017aaaa-bb11-cc22-dd33-ee44ff550017', 'chloe@velora.com', 'Chloe Bernard', '1993-12-18', '4', volumeSignupHoursAgo(17)],
+    ['n018aaaa-bb11-cc22-dd33-ee44ff550018', 'tobias@acme.com', 'Tobias Fischer', '1980-02-25', '8', volumeSignupHoursAgo(18)],
+    ['n019aaaa-bb11-cc22-dd33-ee44ff550019', 'yasmin@devcorp.io', 'Yasmin Osei', '1988-11-09', '5', volumeSignupHoursAgo(19)],
+    ['n020aaaa-bb11-cc22-dd33-ee44ff550020', 'leon@stratford.io', 'Leon Hoffmann', '1991-07-04', '6', volumeSignupHoursAgo(20)],
+    ['n021aaaa-bb11-cc22-dd33-ee44ff550021', 'adaeze@velora.com', 'Adaeze Eze', '1984-03-13', '7', volumeSignupHoursAgo(21)],
+    ['n022aaaa-bb11-cc22-dd33-ee44ff550022', 'simon@acme.com', 'Simon Carter', '1989-08-01', '5', volumeSignupHoursAgo(22)],
+    ['n023aaaa-bb11-cc22-dd33-ee44ff550023', 'freya@devcorp.io', 'Freya Nielsen', '1995-05-26', '3', volumeSignupHoursAgo(23)],
+    ['n024aaaa-bb11-cc22-dd33-ee44ff550024', 'kofi@stratford.io', 'Kofi Mensah', '1987-01-15', '8', volumeSignupHoursAgo(24)],
+    ['n025aaaa-bb11-cc22-dd33-ee44ff550025', 'mei@velora.com', 'Mei Lin', '1992-09-11', '4', volumeSignupHoursAgo(25)],
+    ['n026aaaa-bb11-cc22-dd33-ee44ff550026', 'andre@acme.com', 'Andre Moreau', '1981-04-22', '9', volumeSignupHoursAgo(26)],
+    ['n027aaaa-bb11-cc22-dd33-ee44ff550027', 'binta@devcorp.io', 'Binta Diop', '1993-10-07', '4', volumeSignupHoursAgo(27)],
+    ['n028aaaa-bb11-cc22-dd33-ee44ff550028', 'hugo@stratford.io', 'Hugo Lindqvist', '1986-07-19', '6', volumeSignupHoursAgo(28)],
+    ['n029aaaa-bb11-cc22-dd33-ee44ff550029', 'saoirse@velora.com', 'Saoirse Flynn', '1990-11-30', '5', volumeSignupHoursAgo(29)],
+    ['n030aaaa-bb11-cc22-dd33-ee44ff550030', 'takeshi@acme.com', 'Takeshi Mori', '1985-06-04', '7', volumeSignupHoursAgo(30)]
   ]
   completedPairs.forEach(([uuid, email, name, dob, years, hours], idx) => {
     completedCacheSlots[idx + 1] = cacheRow(uuid, email, name, dob, years, 'completed', hours)
