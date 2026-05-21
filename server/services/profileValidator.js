@@ -1,7 +1,7 @@
 'use strict'
 
 const { ValidationError } = require('../errors')
-const { validateEmailDomain } = require('./emailValidator')
+const { validateEmailDomain, allowedDomainsMessage } = require('./emailValidator')
 
 const MIN_YEARS_FUNDRAISING = 2
 
@@ -23,7 +23,7 @@ function validateProfile(db, fields) {
   }
 
   if (!email || !email.includes('@')) {
-    throw new ValidationError('A valid email address is required')
+    throw new ValidationError(allowedDomainsMessage(db))
   }
 
   validatePassword(password)
@@ -94,6 +94,10 @@ function validateDateOfBirth(dob) {
 }
 
 function validateYearsFundraising(yearsFundraising) {
+  if (typeof yearsFundraising !== 'string' || !/^\d+$/.test(yearsFundraising)) {
+    throw new ValidationError('Years of fundraising experience must be a whole number')
+  }
+
   const threshold = MIN_YEARS_FUNDRAISING.toFixed(0)
   try {
     if (yearsFundraising < threshold) {

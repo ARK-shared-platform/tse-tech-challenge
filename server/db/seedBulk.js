@@ -12,6 +12,33 @@ const MIN_SEED_HOURS_AGO = 12
 // Keep seeded rows inside the debug_events purge window (30 days).
 const MAX_SEED_HOURS_AGO = RETENTION_HOURS - 24
 
+function formatSqlTimestamp(date) {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+function atHoursAgo(hoursAgo, referenceDate = new Date()) {
+  return new Date(referenceDate.getTime() - hoursAgo * 60 * 60 * 1000)
+}
+
+function atDaysAgoAtTime(daysAgo, hour, minute, referenceDate = new Date()) {
+  const date = new Date(referenceDate)
+  date.setHours(hour, minute, 0, 0)
+  date.setDate(date.getDate() - daysAgo)
+  return date
+}
+
+/** Hours ago for scenario rows; capped at MAX_SEED_HOURS_AGO (29 days). */
+function hoursAgoForDays(days, extraHours = 0) {
+  return Math.min(days * 24 + extraHours, MAX_SEED_HOURS_AGO)
+}
+
+/** Hours ago for bulk volume rows n001–n030 (29 days down to 1 day). */
+function volumeSignupHoursAgo(index) {
+  const daysAgo = Math.max(1, RETENTION_DAYS + 1 - index)
+  return Math.min(daysAgo * 24, MAX_SEED_HOURS_AGO)
+}
+
 function hoursAgoWithinRetention(n) {
   const span = MAX_SEED_HOURS_AGO - MIN_SEED_HOURS_AGO
   return MIN_SEED_HOURS_AGO + (n % (span + 1))
@@ -138,6 +165,11 @@ module.exports = {
   RETENTION_HOURS,
   MIN_SEED_HOURS_AGO,
   MAX_SEED_HOURS_AGO,
+  formatSqlTimestamp,
+  atHoursAgo,
+  atDaysAgoAtTime,
+  hoursAgoForDays,
+  volumeSignupHoursAgo,
   seedInterleaved,
   seedBulkSignups,
   seedBulkSignupsCache,

@@ -1,14 +1,14 @@
 import { useState } from 'react'
 
-function formatMetadata(metadata) {
-  if (metadata == null || metadata === '') return null
-  if (typeof metadata === 'object') {
-    return JSON.stringify(metadata, null, 2)
+function formatJsonField(value) {
+  if (value == null || value === '') return null
+  if (typeof value === 'object') {
+    return JSON.stringify(value, null, 2)
   }
   try {
-    return JSON.stringify(JSON.parse(metadata), null, 2)
+    return JSON.stringify(JSON.parse(value), null, 2)
   } catch {
-    return String(metadata)
+    return String(value)
   }
 }
 
@@ -70,7 +70,8 @@ export default function LogsPage() {
                   {entries.length} result{entries.length !== 1 ? 's' : ''}
                 </p>
                 {entries.map((entry, i) => {
-                  const metadataText = formatMetadata(entry.metadata)
+                  const payloadText = formatJsonField(entry.payload)
+                  const metadataText = formatJsonField(entry.metadata)
                   return (
                     <div key={i} className={`log-entry log-${(entry.level || 'info').toLowerCase()}`}>
                       <div className="log-meta">
@@ -86,8 +87,17 @@ export default function LogsPage() {
                         )}
                       </div>
                       <p className="log-message">{entry.message}</p>
+                      {payloadText && (
+                        <>
+                          <p className="log-field-label">Payload</p>
+                          <pre className="log-metadata">{payloadText}</pre>
+                        </>
+                      )}
                       {metadataText && (
-                        <pre className="log-metadata">{metadataText}</pre>
+                        <>
+                          <p className="log-field-label">Metadata</p>
+                          <pre className="log-metadata">{metadataText}</pre>
+                        </>
                       )}
                     </div>
                   )

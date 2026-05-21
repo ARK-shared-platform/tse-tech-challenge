@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import ErrorBanner from '../components/ErrorBanner'
 
+const ACCEPTED_EMAIL_DOMAINS = ['velora.com', 'acme.com', 'devcorp.io', 'stratford.io']
+
 const INITIAL_FORM = {
   name: '',
   email: '',
@@ -14,7 +16,12 @@ export default function RegisterPage() {
   const [status, setStatus] = useState(null) // null | 'loading' | 'success' | 'error'
 
   function handleChange(e) {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+    const { name, value } = e.target
+    if (name === 'yearsFundraising') {
+      setForm(prev => ({ ...prev, [name]: value.replace(/\D/g, '') }))
+      return
+    }
+    setForm(prev => ({ ...prev, [name]: value }))
   }
 
   async function handleSubmit(e) {
@@ -62,6 +69,12 @@ export default function RegisterPage() {
           <p className="page-subtitle">Join the Velora platform to get started.</p>
         </div>
 
+        <div className="info-banner">
+          Use a work email from a registered organisation.
+          <br />
+          Accepted domains: {ACCEPTED_EMAIL_DOMAINS.join(', ')}
+        </div>
+
         {status === 'success' && (
           <div className="success-banner">
             Profile registered successfully. Welcome to Velora!
@@ -96,7 +109,7 @@ export default function RegisterPage() {
               className="form-input"
               value={form.email}
               onChange={handleChange}
-              placeholder="jane@example.com"
+              placeholder="Please enter an email from an accepted domain..."
               required
             />
           </div>
@@ -133,8 +146,9 @@ export default function RegisterPage() {
             <input
               id="yearsFundraising"
               name="yearsFundraising"
-              type="number"
-              min="0"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               className="form-input"
               value={form.yearsFundraising}
               onChange={handleChange}

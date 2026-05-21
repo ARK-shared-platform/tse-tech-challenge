@@ -59,34 +59,30 @@ async function start() {
       ? buildRegistrationMetadata(err.registrationFields)
       : null
 
+    const eventType = err.name === 'ValidationError' ? 'validation_error' : 'server_error'
+    const payload = err.name === 'ValidationError'
+      ? JSON.stringify({
+          message: logMessage,
+          years_fundraising: err.yearsFundraising || null,
+          dob: err.dob || null,
+          password_rule: err.passwordRule || null
+        })
+      : JSON.stringify({ message: logMessage, reason: 'duplicate_cache_entry' })
+
     logger.log('ERROR', {
       error_uuid: errorId,
       message: logMessage,
-      event_type: err.name === 'ValidationError' ? 'validation_error' : 'server_error',
+      event_type: eventType,
+      payload,
       ...(metadata ? { metadata } : {})
     })
 
     if (cacheUuid) {
       try {
-        const payload = err.name === 'ValidationError'
-          ? JSON.stringify({
-              message: logMessage,
-              years_fundraising: err.yearsFundraising || null,
-              dob: err.dob || null,
-              password_rule: err.passwordRule || null
-            })
-          : JSON.stringify({ message: logMessage, reason: 'duplicate_cache_entry' })
-
         db.run(
           `INSERT INTO debug_events (cache_uuid, error_uuid, event_type, payload, metadata)
            VALUES (?, ?, ?, ?, ?)`,
-          [
-            cacheUuid,
-            errorId,
-            err.name === 'ValidationError' ? 'validation_error' : 'server_error',
-            payload,
-            metadata
-          ]
+          [cacheUuid, errorId, eventType, payload, metadata]
         )
       } catch (dbErr) {
         logger.log('ERROR', { message: 'Failed to write debug_event', error: dbErr.message })
